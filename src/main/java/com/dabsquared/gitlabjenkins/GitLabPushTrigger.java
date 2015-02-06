@@ -4,12 +4,14 @@ import hudson.Extension;
 import hudson.Util;
 import hudson.model.*;
 import hudson.plugins.git.RevisionParameterAction;
+import hudson.diagnosis.OldDataMonitor;
 import hudson.plugins.git.GitSCM;
 import hudson.scm.SCM;
 import hudson.triggers.Trigger;
 import hudson.triggers.TriggerDescriptor;
 import hudson.util.FormValidation;
 import hudson.util.SequentialExecutionQueue;
+import hudson.util.XStream2;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,14 +24,24 @@ import java.util.logging.Logger;
 
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import javax.annotation.Nullable;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
 import org.gitlab.api.models.GitlabBranch;
 import org.gitlab.api.models.GitlabProject;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+import com.thoughtworks.xstream.converters.UnmarshallingContext;
+
 
 /**
  * Triggers a build when we receive a GitLab WebHook.
@@ -37,30 +49,24 @@ import org.kohsuke.stapler.StaplerRequest;
  * @author Daniel Brooks
  */
 public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
-	private static final Logger LOGGER = Logger.getLogger(GitLabPushTrigger.class.getName());
-	private boolean triggerOnPush = true;
+
+    private static final Logger LOGGER = Logger.getLogger(GitLabPushTrigger.class.getName());
+    private boolean triggerOnPush = true;
     private boolean triggerOnMergeRequest = true;
     private boolean triggerOpenMergeRequestOnPush = true;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
-
-    private List<String> allowedBranches;
-
-    // compatibility with earlier plugins
-    public Object readResolve() {
-        if (null == allowedBranches) {
-        	allowedBranches = new ArrayList<String>();
-        }               
-        return this;
-    }
+    private String allowedBranchesSpec;
+    @Deprecated
+    private transient List<String> allowedBranches;
 
     @DataBoundConstructor
-    public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOpenMergeRequestOnPush, boolean setBuildDescription, List<String> allowedBranches) {
+    public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOpenMergeRequestOnPush, boolean setBuildDescription, String allowedBranchesSpec) {
         this.triggerOnPush = triggerOnPush;
         this.triggerOnMergeRequest = triggerOnMergeRequest;
         this.triggerOpenMergeRequestOnPush = triggerOpenMergeRequestOnPush;
         this.setBuildDescription = setBuildDescription;
-        this.allowedBranches = allowedBranches;
+        this.allowedBranchesSpec = allowedBranchesSpec;
     }
 
     public boolean getTriggerOnPush() {
@@ -83,12 +89,16 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
         return addNoteOnMergeRequest;
     }
 
-    public List<String> getAllowedBranches() {
-    	return allowedBranches;
+    private List<String> getAllowedBranches() {
+    	return DescriptorImpl.getProjectBranches(this.getAllowedBranchesSpec());
+    }
+
+    public String getAllowedBranchesSpec() {
+        return this.allowedBranchesSpec;
     }
 
     public void onPost(final GitLabPushRequest req) {
-    	boolean allowBuild = allowedBranches.isEmpty() || allowedBranches.contains(getSourceBranch(req));
+    	boolean allowBuild = this.getAllowedBranches().isEmpty() || this.getAllowedBranches().contains(getSourceBranch(req));
     	if (triggerOnPush && (allowBuild)) {
             getDescriptor().queue.execute(new Runnable() {
 
@@ -128,7 +138,7 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
                     values.put("gitlabBranch", new StringParameterValue("gitlabBranch", branch));
                     values.put("gitlabSourceRepoName", new StringParameterValue("gitlabSourceRepoName", getDesc().getSourceRepoNameDefault()));
                 	values.put("gitlabSourceRepoURL", new StringParameterValue("gitlabSourceRepoURL", getDesc().getSourceRepoURLDefault().toString()));
-                	
+
                     List<ParameterValue> listValues = new ArrayList<ParameterValue>(values.values());
 
                     ParametersAction parametersAction = new ParametersAction(listValues);
@@ -139,7 +149,7 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
                     Action[] actionsArray = actions.toArray(new Action[0]);
 
                     return actionsArray;
-                }                              
+                }
             });
         }
     }
@@ -175,23 +185,23 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
                     Map<String, ParameterValue> values = new HashMap<String, ParameterValue>();
                     values.put("gitlabSourceBranch", new StringParameterValue("gitlabSourceBranch", getSourceBranch(req)));
                     values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", req.getObjectAttribute().getTargetBranch()));
-                
+
                     String sourceRepoName = getDesc().getSourceRepoNameDefault();
                     String sourceRepoURL = getDesc().getSourceRepoURLDefault().toString();
-                    
-                    if (!getDescriptor().getGitlabHostUrl().isEmpty()) {                                        
+
+                    if (!getDescriptor().getGitlabHostUrl().isEmpty()) {
                     	// Get source repository if communication to Gitlab is possible
                     	try {
-                        	sourceRepoName = req.getSourceProject(getDesc().getGitlab()).getPathWithNamespace();    
-                        	sourceRepoURL = req.getSourceProject(getDesc().getGitlab()).getSshUrl();    
+                        	sourceRepoName = req.getSourceProject(getDesc().getGitlab()).getPathWithNamespace();
+                        	sourceRepoURL = req.getSourceProject(getDesc().getGitlab()).getSshUrl();
                         } catch (IOException ex) {
-                        	LOGGER.log(Level.WARNING, "Could not fetch source project''s data from Gitlab. '('{0}':' {1}')'", new String[]{ex.toString(), ex.getMessage()});                        	
+                        	LOGGER.log(Level.WARNING, "Could not fetch source project''s data from Gitlab. '('{0}':' {1}')'", new String[]{ex.toString(), ex.getMessage()});
                         }
                     }
-                    
+
                     values.put("gitlabSourceRepoName", new StringParameterValue("gitlabSourceRepoName", sourceRepoName));
                 	values.put("gitlabSourceRepoURL", new StringParameterValue("gitlabSourceRepoURL", sourceRepoURL));
-                	                    
+
                     List<ParameterValue> listValues = new ArrayList<ParameterValue>(values.values());
 
                     ParametersAction parametersAction = new ParametersAction(listValues);
@@ -201,9 +211,9 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
                     return actionsArray;
                 }
-                
-                
-            });	
+
+
+            });
     	}
     }
 
@@ -267,10 +277,10 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
     	} else {
     		result = ((GitLabMergeRequest)req).getObjectAttribute().getSourceBranch();
     	}
-    	
+
     	return result;
     }
-    
+
     @Override
     public DescriptorImpl getDescriptor() {
         return DescriptorImpl.get();
@@ -282,7 +292,24 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
     public File getLogFile() {
         return new File(job.getRootDir(), "gitlab-polling.log");
-    }    
+    }
+
+    public static final class ConverterImpl extends XStream2.PassthruConverter<GitLabPushTrigger> {
+
+        public ConverterImpl(final XStream2 xstream) {
+            super(xstream);
+        }
+
+        @Override
+        protected void callback(final GitLabPushTrigger obj, final UnmarshallingContext context) {
+            if (obj.allowedBranches != null) {
+                obj.allowedBranchesSpec = Joiner.on(' ').join(obj.allowedBranches);
+                obj.allowedBranches = null;
+                OldDataMonitor.report(context, "1.1.4@gitlab-plugin");
+            }
+        }
+
+    }
 
     @Extension
     public static class DescriptorImpl extends TriggerDescriptor {
@@ -291,15 +318,13 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
         private String gitlabApiToken;
         private String gitlabHostUrl = "";
         private boolean ignoreCertificateErrors = false;
-        private List<String> projectBranches = null;
-        
         private transient final SequentialExecutionQueue queue = new SequentialExecutionQueue(Jenkins.MasterComputer.threadPoolForRemoting);
         private transient GitLab gitlab;
 
         public DescriptorImpl() {
         	load();
         }
-        
+
         @Override
         public boolean isApplicable(Item item) {
             if(item instanceof AbstractProject) {
@@ -317,7 +342,7 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             }
 
             final List<String> projectParentsUrl = new ArrayList<String>();
-            
+
             try {
 				for (Object parent = project.getParent(); parent instanceof Item; parent = ((Item) parent)
 						.getParent()) {
@@ -347,66 +372,122 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             save();
             gitlab = new GitLab();
             return super.configure(req, formData);
-        }       
-        
-        public List<String> getProjectBranches() {        	
-        	projectBranches = new ArrayList<String>();
-        	try {
-            	/* TODO until java-gitlab-api v1.1.5 is released,
-            		cannot search projects by namespace/name
-            		For now getting project id before getting project branches
-            	 */
-        		URIish sourceRepository = getSourceRepoURLDefault();
-        		if (!gitlabHostUrl.isEmpty() && (null != sourceRepository)) {
-        			List<GitlabProject> projects = getGitlab().instance().getProjects();
-        			for (GitlabProject project : projects) {
-						if(project.getSshUrl().equalsIgnoreCase(sourceRepository.toString()) ||
-							project.getHttpUrl().equalsIgnoreCase(sourceRepository.toString())){
-							//Get all branches of project
-							List<GitlabBranch> branches = getGitlab().instance().getBranches(project);
-							for (GitlabBranch branch : branches){
-								projectBranches.add(branch.getName());
-							}
-							break;
-						}					
-					}    			
-        		}				
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Could not fetch source project''s data from Gitlab. '('{0}':' {1}')'", new String[]{ex.toString(), ex.getMessage()});
-			}
-
-        	return projectBranches;
         }
-        
+
+        private List<String> getProjectBranches() throws IOException, IllegalStateException {
+            final URIish sourceRepository = getSourceRepoURLDefault();
+            if (sourceRepository == null) {
+                throw new IllegalStateException(Messages.GitLabPushTrigger_NoSourceRepository());
+            }
+
+            try {
+                final List<String> branchNames = new ArrayList<String>();
+                if (!gitlabHostUrl.isEmpty()) {
+                    /* TODO until java-gitlab-api v1.1.5 is released,
+                     * cannot search projects by namespace/name
+                     * For now getting project id before getting project branches */
+                    final List<GitlabProject> projects = getGitlab().instance().getProjects();
+                    for (final GitlabProject gitlabProject : projects) {
+                        if (gitlabProject.getSshUrl().equalsIgnoreCase(sourceRepository.toString())
+                            || gitlabProject.getHttpUrl().equalsIgnoreCase(sourceRepository.toString())) {
+                            //Get all branches of project
+                            final List<GitlabBranch> branches = getGitlab().instance().getBranches(gitlabProject);
+                            for (final GitlabBranch branch : branches) {
+                                branchNames.add(branch.getName());
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                return branchNames;
+            } catch (final Error error) {
+                /* WTF WTF WTF */
+                final Throwable cause = error.getCause();
+                if (cause instanceof IOException) {
+                    throw (IOException) cause;
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        private static List<String> getProjectBranches(final String spec) {
+            return Lists.newArrayList(Splitter.on(CharMatcher.WHITESPACE).omitEmptyStrings().trimResults().split(spec));
+        }
+
+        public AutoCompletionCandidates doAutoCompleteAllowedBranchesSpec() {
+            final AutoCompletionCandidates ac = new AutoCompletionCandidates();
+            try {
+                ac.getValues().addAll(this.getProjectBranches());
+            } catch (final IllegalStateException ex) {
+                /* no-op */
+            } catch (final IOException ex) {
+                /* no-op */
+            }
+
+            return ac;
+        }
+
+        public FormValidation doCheckAllowedBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
+            if (!project.hasPermission(Item.CONFIGURE)) {
+                return FormValidation.ok();
+            }
+
+            final List<String> unknownBranches = getProjectBranches(value);
+            if (unknownBranches.isEmpty()) {
+                return FormValidation.ok();
+            }
+
+            final List<String> projectBranches;
+            try {
+                projectBranches = this.getProjectBranches();
+            } catch (final IllegalStateException ex) {
+                return FormValidation.warning(Messages.GitLabPushTrigger_CannotConnectToGitLab(ex.getMessage()));
+            } catch (final IOException ex) {
+                return FormValidation.warning(project.hasPermission(Jenkins.ADMINISTER) ? ex : null,
+                                              Messages.GitLabPushTrigger_CannotCheckBranches());
+            }
+
+            unknownBranches.removeAll(projectBranches);
+            if (!unknownBranches.isEmpty()) {
+                final String unknownBranchNames = StringUtils.join(unknownBranches, ", ");
+                return FormValidation.warning(Messages.GitLabPushTrigger_BranchesNotFound(unknownBranchNames));
+            }
+
+            return FormValidation.ok();
+        }
+
         /**
          * Get the URL of the first declared repository in the project configuration.
          * Use this as default source repository url.
-         * 
+         *
          * @return URIish the default value of the source repository url
+         * @throws IllegalStateException Project does not use git scm.
          */
-        protected URIish getSourceRepoURLDefault() {
-        	URIish url = null;
-        	SCM scm = project.getScm();
-        	if(!(scm instanceof GitSCM)) {
-                throw new IllegalArgumentException("This repo does not use git.");
+        @Nullable
+        protected URIish getSourceRepoURLDefault() throws IllegalStateException {
+            SCM scm = project.getScm();
+            if (!(scm instanceof GitSCM)) {
+                throw new IllegalStateException("This repo does not use git.");
             }
-            if (scm instanceof GitSCM) {
-            	List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
-            	if (!repositories.isEmpty()){
-            		RemoteConfig defaultRepository = repositories.get(repositories.size()-1);
-                	List<URIish> uris = defaultRepository.getURIs();
-                	if (!uris.isEmpty()) {
-                		url = uris.get(uris.size()-1);
-                	}                    	
-            	}           
-            } 
-        	return url;
+
+            List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
+            if (!repositories.isEmpty()) {
+                RemoteConfig defaultRepository = repositories.get(repositories.size() - 1);
+                List<URIish> uris = defaultRepository.getURIs();
+                if (!uris.isEmpty()) {
+                    return uris.get(uris.size() - 1);
+                }
+            }
+
+            return null;
         }
-        
+
         /**
          * Get the Name of the first declared repository in the project configuration.
          * Use this as default source repository Name.
-         * 
+         *
          * @return String with the default name of the source repository
          */
         protected String getSourceRepoNameDefault() {
@@ -418,16 +499,16 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             if (scm instanceof GitSCM) {
             	List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
             	if (!repositories.isEmpty()){
-            		result = repositories.get(repositories.size()-1).getName();            		                	                   
-            	}           
-            } 
+            		result = repositories.get(repositories.size()-1).getName();
+            	}
+            }
         	return result;
         }
 
         public FormValidation doCheckGitlabHostUrl(@QueryParameter String value) {
             if (value == null || value.isEmpty()) {
                 return FormValidation.error("Gitlab host URL required.");
-            }        
+            }
 
             return FormValidation.ok();
         }
@@ -435,11 +516,11 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
         public FormValidation doCheckGitlabApiToken(@QueryParameter String value) {
             if (value == null || value.isEmpty()) {
                 return FormValidation.error("API Token for Gitlab access required");
-            }   
-            
+            }
+
             return FormValidation.ok();
-        }        
-        
+        }
+
         public FormValidation doTestConnection(@QueryParameter("gitlabHostUrl") final String hostUrl,
                 @QueryParameter("gitlabApiToken") final String token, @QueryParameter("ignoreCertificateErrors") final boolean ignoreCertificateErrors) throws IOException {
             try {
@@ -448,7 +529,7 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             } catch (IOException e) {
                 return FormValidation.error("Client error : "+e.getMessage());
             }
-        }        
+        }
 
         public GitLab getGitlab() {
             if (gitlab == null) {
@@ -464,7 +545,7 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
         public String getGitlabHostUrl() {
             return gitlabHostUrl;
         }
-        
+
         public boolean getIgnoreCertificateErrors() {
         	return ignoreCertificateErrors;
         }
