@@ -12,9 +12,15 @@
       <f:checkbox default="true" />
     </f:entry>
     <f:entry title="Add note with build status on merge requests" field="addNoteOnMergeRequest">
-      <f:checkbox default="true" />
+        <f:checkbox default="true" />
     </f:entry>
-    <f:entry title="Filter branches" help="/plugin/gitlab-plugin/help/help-allowedBranches.html">
-        <f:textbox field="allowedBranchesSpec" autocompleteDelimChar=" " />
-    </f:entry>
+    <f:optionalBlock title="Filter branches" help="/plugin/gitlab-plugin/help/help-allowedBranches.html"
+                     inline="true" checked="${not (empty(instance.includeBranchesSpec) and empty(instance.excludeBranchesSpec))}">
+        <f:entry title="Include">
+            <f:textbox field="includeBranchesSpec" autocompleteDelimChar="," />
+        </f:entry>
+        <f:entry title="Exclude">
+            <f:textbox field="excludeBranchesSpec" autocompleteDelimChar="," />
+        </f:entry>
+    </f:optionalBlock>
 </j:jelly>

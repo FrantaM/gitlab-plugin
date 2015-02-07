@@ -4,7 +4,6 @@ import hudson.Extension;
 import hudson.Util;
 import hudson.model.*;
 import hudson.plugins.git.RevisionParameterAction;
-import hudson.diagnosis.OldDataMonitor;
 import hudson.plugins.git.GitSCM;
 import hudson.scm.SCM;
 import hudson.triggers.Trigger;
@@ -35,12 +34,22 @@ import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
+import org.springframework.util.AntPathMatcher;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+import com.thoughtworks.xstream.converters.Converter;
+import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.UnmarshallingContext;
+import com.thoughtworks.xstream.converters.collections.CollectionConverter;
+import com.thoughtworks.xstream.converters.reflection.AbstractReflectionConverter;
+import com.thoughtworks.xstream.io.HierarchicalStreamReader;
+import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
+import com.thoughtworks.xstream.mapper.MapperWrapper;
 
 
 /**
@@ -56,17 +65,18 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
     private boolean triggerOpenMergeRequestOnPush = true;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
-    private String allowedBranchesSpec;
-    @Deprecated
-    private transient List<String> allowedBranches;
+    private final String includeBranchesSpec;
+    private final String excludeBranchesSpec;
 
     @DataBoundConstructor
-    public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOpenMergeRequestOnPush, boolean setBuildDescription, String allowedBranchesSpec) {
+    public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOpenMergeRequestOnPush, boolean setBuildDescription,
+            String includeBranchesSpec, String excludeBranchesSpec) {
         this.triggerOnPush = triggerOnPush;
         this.triggerOnMergeRequest = triggerOnMergeRequest;
         this.triggerOpenMergeRequestOnPush = triggerOpenMergeRequestOnPush;
         this.setBuildDescription = setBuildDescription;
-        this.allowedBranchesSpec = allowedBranchesSpec;
+        this.includeBranchesSpec = includeBranchesSpec;
+        this.excludeBranchesSpec = excludeBranchesSpec;
     }
 
     public boolean getTriggerOnPush() {
@@ -89,17 +99,38 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
         return addNoteOnMergeRequest;
     }
 
-    private List<String> getAllowedBranches() {
-    	return DescriptorImpl.getProjectBranches(this.getAllowedBranchesSpec());
+    private boolean isBranchAllowed(final String branchName) {
+        final List<String> exclude = DescriptorImpl.splitBranchSpec(this.getExcludeBranchesSpec());
+        final List<String> include = DescriptorImpl.splitBranchSpec(this.getIncludeBranchesSpec());
+        if (exclude.isEmpty() && include.isEmpty()) {
+            return true;
+        }
+
+        final AntPathMatcher matcher = new AntPathMatcher();
+        for (final String pattern : exclude) {
+            if (matcher.match(pattern, branchName)) {
+                return false;
+            }
+        }
+        for (final String pattern : include) {
+            if (matcher.match(pattern, branchName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    public String getAllowedBranchesSpec() {
-        return this.allowedBranchesSpec;
+    public String getIncludeBranchesSpec() {
+        return this.includeBranchesSpec;
+    }
+
+    public String getExcludeBranchesSpec() {
+        return this.excludeBranchesSpec;
     }
 
     public void onPost(final GitLabPushRequest req) {
-    	boolean allowBuild = this.getAllowedBranches().isEmpty() || this.getAllowedBranches().contains(getSourceBranch(req));
-    	if (triggerOnPush && (allowBuild)) {
+    	if (triggerOnPush && this.isBranchAllowed(this.getSourceBranch(req))) {
             getDescriptor().queue.execute(new Runnable() {
 
                 public void run() {
@@ -298,15 +329,54 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
         public ConverterImpl(final XStream2 xstream) {
             super(xstream);
+
+            xstream.registerLocalConverter(GitLabPushTrigger.class, "includeBranchesSpec", new Converter() {
+
+                public Object unmarshal(final HierarchicalStreamReader reader, final UnmarshallingContext context) {
+                    if ("includeBranchesSpec".equalsIgnoreCase(reader.getNodeName())) {
+                        return reader.getValue();
+                    }
+                    if ("allowedBranchesSpec".equalsIgnoreCase(reader.getNodeName())) {
+                        return reader.getValue();
+                    }
+                    if ("allowedBranches".equalsIgnoreCase(reader.getNodeName())) {
+                        final Converter iconv = new CollectionConverter(xstream.getMapper(), List.class);
+                        final List<?> list = (List<?>) iconv.unmarshal(reader, context);
+                        return Joiner.on(',').join(list);
+                    }
+
+                    throw new AbstractReflectionConverter.UnknownFieldException(context.getRequiredType().getName(), reader.getNodeName());
+                }
+
+                public void marshal(final Object source, final HierarchicalStreamWriter writer, final MarshallingContext context) {
+                    writer.setValue(String.valueOf(source));
+                }
+
+                public boolean canConvert(final Class type) {
+                    return List.class.isAssignableFrom(type) || String.class.isAssignableFrom(type);
+                }
+            });
+
+            synchronized (xstream) {
+                xstream.setMapper(new MapperWrapper(xstream.getMapperInjectionPoint()) {
+
+                    @Override
+                    public String realMember(final Class type, final String serialized) {
+                        if (GitLabPushTrigger.class.equals(type)) {
+                            if ("allowedBranchesSpec".equalsIgnoreCase(serialized) || "allowedBranches".equalsIgnoreCase(serialized)) {
+                                return "includeBranchesSpec";
+                            }
+                        }
+                        return super.realMember(type, serialized);
+                    }
+
+                });
+            }
         }
 
         @Override
         protected void callback(final GitLabPushTrigger obj, final UnmarshallingContext context) {
-            if (obj.allowedBranches != null) {
-                obj.allowedBranchesSpec = Joiner.on(' ').join(obj.allowedBranches);
-                obj.allowedBranches = null;
-                OldDataMonitor.report(context, "1.1.4@gitlab-plugin");
-            }
+            /* no-op */
         }
 
     }
@@ -412,11 +482,11 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             }
         }
 
-        private static List<String> getProjectBranches(final String spec) {
-            return Lists.newArrayList(Splitter.on(CharMatcher.WHITESPACE).omitEmptyStrings().trimResults().split(spec));
+        private static List<String> splitBranchSpec(final String spec) {
+            return Lists.newArrayList(Splitter.on(',').omitEmptyStrings().trimResults().split(spec));
         }
 
-        public AutoCompletionCandidates doAutoCompleteAllowedBranchesSpec() {
+        private AutoCompletionCandidates doAutoCompleteBranchesSpec() {
             final AutoCompletionCandidates ac = new AutoCompletionCandidates();
             try {
                 ac.getValues().addAll(this.getProjectBranches());
@@ -429,13 +499,21 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             return ac;
         }
 
-        public FormValidation doCheckAllowedBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
+        public AutoCompletionCandidates doAutoCompleteIncludeBranchesSpec() {
+            return this.doAutoCompleteBranchesSpec();
+        }
+
+        public AutoCompletionCandidates doAutoCompleteExcludeBranchesSpec() {
+            return this.doAutoCompleteBranchesSpec();
+        }
+
+        private FormValidation doCheckBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
             if (!project.hasPermission(Item.CONFIGURE)) {
                 return FormValidation.ok();
             }
 
-            final List<String> unknownBranches = getProjectBranches(value);
-            if (unknownBranches.isEmpty()) {
+            final List<String> branchSpecs = splitBranchSpec(value);
+            if (branchSpecs.isEmpty()) {
                 return FormValidation.ok();
             }
 
@@ -449,13 +527,32 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
                                               Messages.GitLabPushTrigger_CannotCheckBranches());
             }
 
-            unknownBranches.removeAll(projectBranches);
-            if (!unknownBranches.isEmpty()) {
-                final String unknownBranchNames = StringUtils.join(unknownBranches, ", ");
-                return FormValidation.warning(Messages.GitLabPushTrigger_BranchesNotFound(unknownBranchNames));
+            final Multimap<String, String> matchedSpecs = HashMultimap.create();
+            final AntPathMatcher matcher = new AntPathMatcher();
+            for (final String projectBranch : projectBranches) {
+                for (final String branchSpec : branchSpecs) {
+                    if (matcher.match(branchSpec, projectBranch)) {
+                        matchedSpecs.put(branchSpec, projectBranch);
+                    }
+                }
             }
 
-            return FormValidation.ok();
+            branchSpecs.removeAll(matchedSpecs.keySet());
+            if (!branchSpecs.isEmpty()) {
+                final String unknownBranchNames = StringUtils.join(branchSpecs, ", ");
+                return FormValidation.warning(Messages.GitLabPushTrigger_BranchesNotFound(unknownBranchNames));
+            } else {
+                final int matchedBranchesCount = Sets.newHashSet(matchedSpecs.values()).size();
+                return FormValidation.ok(Messages.GitLabPushTrigger_BranchesMatched(matchedBranchesCount));
+            }
+        }
+
+        public FormValidation doCheckIncludeBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
+            return this.doCheckBranchesSpec(project, value);
+        }
+
+        public FormValidation doCheckExcludeBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
+            return this.doCheckBranchesSpec(project, value);
         }
 
         /**
