@@ -11,18 +11,18 @@ import org.apache.commons.lang.builder.ToStringStyle;
  * @author Daniel Brooks
  */
 public class GitLabPushRequest extends GitLabRequest {
+
     public static GitLabPushRequest create(String payload) {
         if (payload == null) {
             throw new IllegalArgumentException("payload should not be null");
         }
-     
-        GitLabPushRequest pushRequest =  Builder.INSTANCE.get().fromJson(payload, GitLabPushRequest.class);
+
+        GitLabPushRequest pushRequest = Builder.INSTANCE.get().fromJson(payload, GitLabPushRequest.class);
         return pushRequest;
     }
 
     public GitLabPushRequest() {
     }
-
 
     private String before;
     private String after;
@@ -33,17 +33,18 @@ public class GitLabPushRequest extends GitLabRequest {
     private Integer total_commits_count;
     private Repository repository;
     private List<Commit> commits;
-    
+
     public List<Commit> getCommits() {
         return commits;
     }
+
     public Commit getLastCommit() {
         if (commits.isEmpty()) {
             return null;
         }
         return commits.get(commits.size() - 1);
     }
-    
+
     public void setCommits(List<Commit> commits) {
         this.commits = commits;
     }
@@ -162,7 +163,6 @@ public class GitLabPushRequest extends GitLabRequest {
             this.homepage = homepage;
         }
 
-
         @Override
         public String toString() {
             return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);
@@ -261,5 +261,7 @@ public class GitLabPushRequest extends GitLabRequest {
         public String toString() {
             return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);
         }
+
     }
+
 }

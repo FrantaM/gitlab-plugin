@@ -1,9 +1,9 @@
 package com.dabsquared.gitlabjenkins;
 
-import hudson.triggers.SCMTrigger;
-
 import java.io.File;
 import java.io.IOException;
+
+import hudson.triggers.SCMTrigger;
 
 /**
  * Created by daniel on 6/8/14.
@@ -32,8 +32,8 @@ public class GitLabMergeCause extends SCMTrigger.SCMTriggerCause {
 
     @Override
     public String getShortDescription() {
-        return "GitLab Merge Request #" + this.mergeRequest.getObjectAttribute().getIid() + " : " + this.mergeRequest.getObjectAttribute().getSourceBranch() +
-                " => " + this.mergeRequest.getObjectAttribute().getTargetBranch();
+        return "GitLab Merge Request #" + this.mergeRequest.getObjectAttribute().getIid() + " : " + this.mergeRequest.getObjectAttribute().getSourceBranch()
+               + " => " + this.mergeRequest.getObjectAttribute().getTargetBranch();
     }
 
 }

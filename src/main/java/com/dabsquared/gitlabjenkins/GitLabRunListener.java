@@ -1,12 +1,12 @@
 package com.dabsquared.gitlabjenkins;
 
+import javax.annotation.Nonnull;
+
 import hudson.Extension;
 import hudson.model.AbstractBuild;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
 import hudson.triggers.Trigger;
-
-import javax.annotation.Nonnull;
 
 /**
  * RunListener that will be called when a build starts and completes.
@@ -34,11 +34,12 @@ public class GitLabRunListener extends RunListener<AbstractBuild> {
         super.onStarted(abstractBuild, listener);
     }
 
-
     private GitLabPushTrigger getTrigger(AbstractBuild abstractBuild) {
         Trigger trig = abstractBuild.getProject().getTrigger(GitLabPushTrigger.class);
-        if (trig != null && trig instanceof GitLabPushTrigger)
+        if (trig != null && trig instanceof GitLabPushTrigger) {
             return (GitLabPushTrigger) trig;
+        }
         return null;
     }
+
 }

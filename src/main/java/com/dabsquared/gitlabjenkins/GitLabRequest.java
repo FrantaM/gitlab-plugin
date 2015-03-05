@@ -16,39 +16,44 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 
 public class GitLabRequest {
-	protected enum Builder {
-		INSTANCE;
-		private final Gson gson;
 
-		Builder() {
-			gson = new GsonBuilder()
-	        .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-	        .registerTypeAdapter(Date.class, new GitLabRequest.DateSerializer())
-	        .create();				
-		}
-		
-		public Gson get(){
-			return gson;
-		}
-	};
+    protected enum Builder {
 
-	private static final String[] DATE_FORMATS = new String[] {
-			"yyyy-MM-dd HH:mm:ss Z", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" };
+        INSTANCE;
+        private final Gson gson;
 
-	private static class DateSerializer implements JsonDeserializer<Date> {
-		public Date deserialize(JsonElement jsonElement, Type typeOF,
-				JsonDeserializationContext context) throws JsonParseException {
-			for (String format : DATE_FORMATS) {
-				try {
-					return new SimpleDateFormat(format, Locale.US)
-							.parse(jsonElement.getAsString());
-				} catch (ParseException e) {
-				}
-			}
-			throw new JsonParseException("Unparseable date: \""
-					+ jsonElement.getAsString() + "\". Supported formats: "
-					+ Arrays.toString(DATE_FORMATS));
-		}
-	}
+        Builder() {
+            gson = new GsonBuilder()
+                    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                    .registerTypeAdapter(Date.class, new GitLabRequest.DateSerializer())
+                    .create();
+        }
+
+        public Gson get() {
+            return gson;
+        }
+
+    };
+
+    private static final String[] DATE_FORMATS = new String[] {
+        "yyyy-MM-dd HH:mm:ss Z", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" };
+
+    private static class DateSerializer implements JsonDeserializer<Date> {
+
+        public Date deserialize(JsonElement jsonElement, Type typeOF,
+                                JsonDeserializationContext context) throws JsonParseException {
+            for (String format : DATE_FORMATS) {
+                try {
+                    return new SimpleDateFormat(format, Locale.US)
+                            .parse(jsonElement.getAsString());
+                } catch (ParseException e) {
+                }
+            }
+            throw new JsonParseException("Unparseable date: \""
+                                         + jsonElement.getAsString() + "\". Supported formats: "
+                                         + Arrays.toString(DATE_FORMATS));
+        }
+
+    }
 
 }

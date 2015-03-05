@@ -1,9 +1,9 @@
 package com.dabsquared.gitlabjenkins;
 
-import hudson.triggers.SCMTrigger;
-
 import java.io.File;
 import java.io.IOException;
+
+import hudson.triggers.SCMTrigger;
 
 /**
  * Created by daniel on 6/8/14.
@@ -34,4 +34,5 @@ public class GitLabPushCause extends SCMTrigger.SCMTriggerCause {
             return String.format("Started by GitLab push by %s", pushedBy);
         }
     }
+
 }
