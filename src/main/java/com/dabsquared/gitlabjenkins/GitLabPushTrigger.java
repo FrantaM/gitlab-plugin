@@ -23,6 +23,7 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.springframework.util.AntPathMatcher;
 
+import com.dabsquared.gitlabjenkins.models.GitlabPushEvent;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.HashMultimap;
@@ -146,6 +147,18 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
     public String getExcludeBranchesSpec() {
         return this.excludeBranchesSpec;
+    }
+
+    public void run(final GitlabPushEvent event) {
+        final String branchName = StringUtils.removeStart(event.getRef(), "ref/heads/");
+        if (this.getTriggerOnPush() && this.isBranchAllowed(branchName)) {
+            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
+            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
+
+            final GitLabPushCause cause = new GitLabPushCause(event.getUserName());
+            job.scheduleBuild2(job.getQuietPeriod(), cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
+        }
     }
 
     public void onPost(final GitLabPushRequest req) {

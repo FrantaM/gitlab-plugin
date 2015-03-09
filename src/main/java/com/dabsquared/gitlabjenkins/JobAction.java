@@ -24,10 +24,12 @@
 package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.kohsuke.stapler.HttpResponse;
@@ -37,7 +39,13 @@ import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
+import com.dabsquared.gitlabjenkins.models.GitlabPushEvent;
+import com.google.common.base.Charsets;
+import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
+import com.google.common.io.CharStreams;
+
+import net.sf.json.JSONObject;
 
 import hudson.Util;
 import hudson.model.AbstractProject;
@@ -220,6 +228,24 @@ public class JobAction {
 
     public HttpResponse doStatus(@QueryParameter final String ref) {
         return StatusImage.forRun(findRunByRef(ref)).respond();
+    }
+
+    public HttpResponse doBuild(final StaplerRequest req) throws IOException {
+        JobAction.validateToken(this.ctx);
+
+        final GitLabPushTrigger trigger = findTrigger(this.asJob());
+        final String encoding = Objects.firstNonNull(req.getCharacterEncoding(), Charsets.UTF_8.name());
+        final String payload = CharStreams.toString(new InputStreamReader(req.getInputStream(), encoding));
+        final JSONObject json = JSONObject.fromObject(payload);
+
+        if (!json.containsKey("object_kind")) {
+            final GitlabPushEvent event = (GitlabPushEvent) JSONObject.toBean(json, GitlabPushEvent.class);
+            if (!event.isTagEvent() && trigger.getTriggerOnPush()) {
+                trigger.run(event);
+            }
+        }
+
+        throw HttpResponses.status(HttpServletResponse.SC_BAD_REQUEST);
     }
 
     public void doDynamic(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException {
