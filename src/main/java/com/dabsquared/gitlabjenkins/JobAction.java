@@ -31,10 +31,15 @@ import javax.servlet.ServletException;
 
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.kohsuke.stapler.HttpResponse;
+import org.kohsuke.stapler.HttpResponses.HttpResponseException;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
+import com.google.common.collect.Iterables;
+
+import hudson.Util;
 import hudson.model.AbstractProject;
 import hudson.model.Item;
 import hudson.model.ItemGroup;
@@ -45,6 +50,8 @@ import hudson.plugins.git.util.Build;
 import hudson.plugins.git.util.BuildData;
 import hudson.security.ACL;
 import hudson.util.HttpResponses;
+
+import jenkins.model.ParameterizedJobMixIn;
 
 /**
  * Gitlab actions/info related to a job.
@@ -82,7 +89,58 @@ public class JobAction {
         });
 
         final Item job = holder[0];
+
+        /* Filter out jobs w/out gitlab trigger */
+        if (job instanceof Job<?, ?>) {
+            findTrigger((Job<?, ?>) job);
+        }
+
         return job != null ? new JobAction(job) : null;
+    }
+
+    /**
+     * Returns gitlab trigger of supplied job, if configured.
+     *
+     * @param job
+     * @return Gitlab trigger
+     * @throws HttpResponseException HTTP/404 Trigger not found.
+     */
+    @Nonnull
+    private static GitLabPushTrigger findTrigger(final Job<?, ?> job) {
+        GitLabPushTrigger trigger = null;
+        if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
+            final ParameterizedJobMixIn.ParameterizedJob pj = (ParameterizedJobMixIn.ParameterizedJob) job;
+            trigger = Iterables.getFirst(Util.filter(pj.getTriggers().values(), GitLabPushTrigger.class), null);
+        }
+        if (trigger == null) {
+            throw HttpResponses.notFound();
+        }
+
+        return trigger;
+    }
+
+    /**
+     * Validates access token in current request against
+     * the one in job configuration.
+     *
+     * @param ctx Current Job or Run.
+     * @throws HttpResponseException HTTP/403 Access token empty or mismatch.
+     * @throws HttpResponseException HTTP/404 Gitlab trigger not configured.
+     * @throws IllegalArgumentException Unsupported input parameter.
+     */
+    static void validateToken(Object ctx) {
+        if (ctx instanceof Run<?, ?>) {
+            ctx = ((Run<?, ?>) ctx).getParent();
+        }
+        if (ctx instanceof Job<?, ?>) {
+            final String actualToken = Util.fixEmptyAndTrim(Stapler.getCurrentRequest().getParameter("token"));
+            final String expectedToken = Util.fixEmptyAndTrim(JobAction.findTrigger((Job<?, ?>) ctx).getToken());
+            if (actualToken == null || !actualToken.equals(expectedToken)) {
+                throw HttpResponses.forbidden();
+            }
+            return;
+        }
+        throw new IllegalArgumentException();
     }
 
     private Job<?, ?> asJob() {

@@ -18,6 +18,7 @@ import org.gitlab.api.models.GitlabBranch;
 import org.gitlab.api.models.GitlabProject;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.springframework.util.AntPathMatcher;
@@ -38,6 +39,8 @@ import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
 import com.thoughtworks.xstream.mapper.MapperWrapper;
 
 import net.sf.json.JSONObject;
+
+import lombok.Getter;
 
 import hudson.Extension;
 import hudson.Util;
@@ -78,6 +81,11 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
     private boolean addNoteOnMergeRequest = true;
     private final String includeBranchesSpec;
     private final String excludeBranchesSpec;
+    /**
+     * Access token needed for some actions.
+     */
+    @Getter @DataBoundSetter
+    private String token;
 
     @DataBoundConstructor
     public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOpenMergeRequestOnPush, boolean setBuildDescription,
@@ -571,6 +579,10 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
         public FormValidation doCheckExcludeBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
             return this.doCheckBranchesSpec(project, value);
+        }
+
+        public FormValidation doCheckToken(@QueryParameter final String value) {
+            return FormValidation.validateRequired(value);
         }
 
         /**

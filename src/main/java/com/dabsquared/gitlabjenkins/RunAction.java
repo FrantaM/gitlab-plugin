@@ -60,6 +60,8 @@ public class RunAction {
     }
 
     public HttpResponse doStatus() {
+        JobAction.validateToken(this.run);
+
         final JSONObject json = new JSONObject();
         json.element("id", this.run.getNumber());
         json.element("status", StatusImage.forRun(this.run).asText());
