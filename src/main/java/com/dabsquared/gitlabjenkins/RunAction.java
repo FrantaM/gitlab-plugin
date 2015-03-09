@@ -26,6 +26,7 @@ package com.dabsquared.gitlabjenkins;
 import java.io.IOException;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 
 import org.kohsuke.stapler.HttpResponse;
@@ -35,6 +36,7 @@ import org.kohsuke.stapler.StaplerResponse;
 import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
 
+import hudson.model.Job;
 import hudson.model.Run;
 import hudson.plugins.git.Revision;
 import hudson.plugins.git.util.BuildData;
@@ -49,27 +51,34 @@ import hudson.util.HttpResponses;
 public class RunAction {
 
     @Nonnull
+    private final Job<?, ?> job;
+    @Nullable
     private final Run<?, ?> run;
 
-    public RunAction(final Run<?, ?> run) {
+    public RunAction(@Nonnull final Job<?, ?> job, @Nullable final Run<?, ?> run) {
+        this.job = job;
         this.run = run;
     }
 
     public HttpResponse doIndex() {
-        return HttpResponses.redirectViaContextPath(this.run.getUrl());
+        final String url = run != null ? run.getUrl() : job.getUrl();
+        return HttpResponses.redirectViaContextPath(url);
     }
 
     public HttpResponse doStatus() {
-        JobAction.validateToken(this.run);
+        JobAction.validateToken(this.job);
 
         final JSONObject json = new JSONObject();
-        json.element("id", this.run.getNumber());
         json.element("status", StatusImage.forRun(this.run).asText());
-        json.element("coverage", JSONNull.getInstance());
 
-        final Revision lastrev = run.getAction(BuildData.class).getLastBuiltRevision();
-        assert lastrev != null;
-        json.element("sha", lastrev.getSha1String());
+        if (run != null) {
+            json.element("id", run.getNumber());
+            json.element("coverage", JSONNull.getInstance());
+
+            final Revision lastrev = run.getAction(BuildData.class).getLastBuiltRevision();
+            assert lastrev != null;
+            json.element("sha", lastrev.getSha1String());
+        }
 
         return new HttpResponse() {
 

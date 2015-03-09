@@ -136,7 +136,7 @@ public class JobAction {
      * @throws HttpResponseException HTTP/404 Gitlab trigger not configured.
      * @throws IllegalArgumentException Unsupported input parameter.
      */
-    static void validateToken(Object ctx) {
+    static void validateToken(@Nonnull Object ctx) {
         if (ctx instanceof Run<?, ?>) {
             ctx = ((Run<?, ?>) ctx).getParent();
         }
@@ -220,10 +220,10 @@ public class JobAction {
         return JobAction.findJob(this.ctx, name);
     }
 
-    @Nullable
+    @Nonnull
     public RunAction getCommits(final String hash) {
         final Run<?, ?> run = this.findRunByHash(hash);
-        return run != null ? new RunAction(run) : null;
+        return new RunAction(asJob(), run);
     }
 
     public HttpResponse doStatus(@QueryParameter final String ref) {
