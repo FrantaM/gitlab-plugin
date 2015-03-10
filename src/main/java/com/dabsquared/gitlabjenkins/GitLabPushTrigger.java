@@ -49,7 +49,9 @@ import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.AutoCompletionCandidates;
+import hudson.model.BuildableItem;
 import hudson.model.Cause;
+import hudson.model.CauseAction;
 import hudson.model.Item;
 import hudson.model.Job;
 import hudson.model.ParameterValue;
@@ -66,13 +68,14 @@ import hudson.util.SequentialExecutionQueue;
 import hudson.util.XStream2;
 
 import jenkins.model.Jenkins;
+import jenkins.triggers.SCMTriggerItem;
 
 /**
  * Triggers a build when we receive a GitLab WebHook.
  *
  * @author Daniel Brooks
  */
-public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
+public class GitLabPushTrigger extends Trigger<BuildableItem> {
 
     private static final Logger LOGGER = Logger.getLogger(GitLabPushTrigger.class.getName());
     private boolean triggerOnPush = true;
@@ -157,7 +160,23 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
             parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
 
             final GitLabPushCause cause = new GitLabPushCause(event.getUserName());
-            job.scheduleBuild2(job.getQuietPeriod(), cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
+            this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
+        }
+    }
+
+    private void schedule(final Cause cause, final Action... actions) {
+        if (job instanceof SCMTriggerItem) {
+            final SCMTriggerItem i = (SCMTriggerItem) job;
+            final Action[] realActions = new Action[actions.length + 1];
+            realActions[0] = new CauseAction(cause);
+            System.arraycopy(actions, 0, realActions, 1, actions.length);
+            i.scheduleBuild2(i.getQuietPeriod(), realActions);
+        } else if (job instanceof AbstractProject<?, ?>) {
+            final AbstractProject<?, ?> i = (AbstractProject<?, ?>) job;
+            i.scheduleBuild2(i.getQuietPeriod(), cause, actions);
+        } else {
+            LOGGER.severe(String.format("Cannot pass actions to job %s.", job));
+            job.scheduleBuild(cause);
         }
     }
 
@@ -167,10 +186,11 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
                 public void run() {
                     LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
-                    String name = " #" + job.getNextBuildNumber();
+                    final AbstractProject<?,?> p = (AbstractProject<?,?>)job;
+                    String name = " #" + p.getNextBuildNumber();
                     GitLabPushCause cause = createGitLabPushCause(req);
                     Action[] actions = createActions(req);
-                    if (job.scheduleBuild(job.getQuietPeriod(), cause, actions)) {
+                    if (p.scheduleBuild(p.getQuietPeriod(), cause, actions)) {
                         LOGGER.log(Level.INFO, "GitLab Push Request detected in {0}. Triggering {1}", new String[] { job.getName(), name });
                     } else {
                         LOGGER.log(Level.INFO, "GitLab Push Request detected in {0}. Job is already in the queue.", job.getName());
@@ -224,10 +244,11 @@ public class GitLabPushTrigger extends Trigger<AbstractProject<?, ?>> {
 
                 public void run() {
                     LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
-                    String name = " #" + job.getNextBuildNumber();
+                    final AbstractProject<?,?> p = (AbstractProject<?,?>)job;
+                    String name = " #" + p.getNextBuildNumber();
                     GitLabMergeCause cause = createGitLabMergeCause(req);
                     Action[] actions = createActions(req);
-                    if (job.scheduleBuild(job.getQuietPeriod(), cause, actions)) {
+                    if (p.scheduleBuild(p.getQuietPeriod(), cause, actions)) {
                         LOGGER.log(Level.INFO, "GitLab Merge Request detected in {0}. Triggering {1}", new String[] { job.getName(), name });
                     } else {
                         LOGGER.log(Level.INFO, "GitLab Merge Request detected in {0}. Job is already in the queue.", job.getName());
