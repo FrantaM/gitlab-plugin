@@ -24,6 +24,12 @@
 package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -36,11 +42,16 @@ import org.kohsuke.stapler.StaplerResponse;
 import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
 
+import hudson.model.Fingerprint;
+import hudson.model.Fingerprint.RangeSet;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.plugins.git.Revision;
 import hudson.plugins.git.util.BuildData;
+import hudson.tasks.Fingerprinter.FingerprintAction;
 import hudson.util.HttpResponses;
+
+import jenkins.model.Jenkins;
 
 /**
  * Gitlab actions/info related to a run.
@@ -50,8 +61,28 @@ import hudson.util.HttpResponses;
  */
 public class RunAction {
 
+    private static Comparator<Run<?, ?>> RUN_COMPARATOR = new Comparator<Run<?, ?>>() {
+
+        @Override
+        public int compare(final Run<?, ?> o1, final Run<?, ?> o2) {
+            int d = o1.getParent().getFullName().compareTo(o2.getParent().getFullName());
+            if (d == 0) {
+                d = o1.getNumber() - o2.getNumber();
+            }
+            return d;
+        }
+
+    };
+    /**
+     * Job of {@link #run}.
+     * Needed because the run may be null.
+     */
     @Nonnull
     private final Job<?, ?> job;
+    /**
+     * Root build of specified commit.
+     * Null means that that commit wasn't build.
+     */
     @Nullable
     private final Run<?, ?> run;
 
@@ -69,7 +100,7 @@ public class RunAction {
         JobAction.validateToken(this.job);
 
         final JSONObject json = new JSONObject();
-        json.element("status", StatusImage.forRun(this.run).asText());
+        StatusImage overallStatus = StatusImage.forRun(this.run);
 
         if (run != null) {
             json.element("id", run.getNumber());
@@ -78,7 +109,14 @@ public class RunAction {
             final Revision lastrev = run.getAction(BuildData.class).getLastBuiltRevision();
             assert lastrev != null;
             json.element("sha", lastrev.getSha1String());
+
+            for (final Run<?, ?> downstream : this.findAllRuns()) {
+                json.accumulate("builds", downstream.getFullDisplayName());
+                overallStatus = StatusImage.moreImportant(overallStatus, StatusImage.forRun(downstream));
+            }
         }
+
+        json.element("status", overallStatus.asText());
 
         return new HttpResponse() {
 
@@ -89,6 +127,38 @@ public class RunAction {
             }
 
         };
+    }
+
+    private SortedSet<Run<?, ?>> findAllRuns() {
+        final SortedSet<Run<?, ?>> list = new TreeSet<Run<?, ?>>(RUN_COMPARATOR);
+        if (this.run != null) {
+            list.add(this.run);
+            list.addAll(this.findDownstreamRuns(list, this.run));
+        }
+
+        return list;
+    }
+
+    private SortedSet<Run<?, ?>> findDownstreamRuns(final SortedSet<Run<?, ?>> list, final Run<?, ?> run) {
+        for (final FingerprintAction fa : run.getActions(FingerprintAction.class)) {
+            for (final Fingerprint fp : fa.getFingerprints().values()) {
+                for (final Map.Entry<String, RangeSet> e : fp.getUsages().entrySet()) {
+                    final Job<?, ?> fpjob = Jenkins.getActiveInstance().getItemByFullName(e.getKey(), Job.class);
+                    if (fpjob != null) {
+                        for (final int build : e.getValue().listNumbers()) {
+                            final Run<?, ?> fprun = fpjob.getBuildByNumber(build);
+                            if (fprun != null) {
+                                if (list.add(fprun)) {
+                                    this.findDownstreamRuns(list, fprun);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return list;
     }
 
     public void doDynamic(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException {

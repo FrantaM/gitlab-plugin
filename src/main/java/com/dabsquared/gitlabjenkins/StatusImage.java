@@ -49,7 +49,7 @@ import jenkins.model.Jenkins;
  */
 public enum StatusImage {
 
-    UNKNOWN, UNSTABLE, RUNNING, SUCCESS, FAILED;
+    UNKNOWN, SUCCESS, RUNNING, UNSTABLE, FAILED;
 
     @Nonnull
     public static StatusImage forRun(@Nullable final Run<?, ?> run) {
@@ -94,6 +94,10 @@ public enum StatusImage {
             return "pending";
         }
         return this.name().toLowerCase(Locale.ROOT);
+    }
+
+    public static StatusImage moreImportant(final StatusImage a, final StatusImage b) {
+        return a.ordinal() > b.ordinal() ? a : b;
     }
 
     public HttpResponse respond() {
