@@ -240,7 +240,7 @@ public class JobAction {
 
         if (!json.containsKey("object_kind")) {
             final GitlabPushEvent event = (GitlabPushEvent) JSONObject.toBean(json, GitlabPushEvent.class);
-            if (!event.isTagEvent() && trigger.getTriggerOnPush()) {
+            if (!event.isTagEvent() && trigger.isTriggerOnPush()) {
                 trigger.run(event);
             }
         }

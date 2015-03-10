@@ -325,7 +325,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
             }
             trigger.onPost(request);
 
-            if (trigger.getTriggerOpenMergeRequestOnPush()) {
+            if (trigger.isTriggerOpenMergeRequestOnPush()) {
                 // Fetch and build open merge requests with the same source branch
                 buildOpenMergeRequests(trigger, request.getProject_id(), request.getRef());
             }

@@ -42,6 +42,7 @@ import com.thoughtworks.xstream.mapper.MapperWrapper;
 import net.sf.json.JSONObject;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import hudson.Extension;
 import hudson.Util;
@@ -78,40 +79,43 @@ import jenkins.triggers.SCMTriggerItem;
 public class GitLabPushTrigger extends Trigger<BuildableItem> {
 
     private static final Logger LOGGER = Logger.getLogger(GitLabPushTrigger.class.getName());
+    /**
+     * Flag whether a push will trigger a build.
+     */
+    @Getter @Setter @DataBoundSetter
     private boolean triggerOnPush = true;
+    /**
+     * Flag whether a merge request will trigger a build.
+     */
+    @Getter @Setter @DataBoundSetter
     private boolean triggerOnMergeRequest = true;
+    /**
+     * Flag whether a push to a branch with open merge request
+     * will trigger a build of that merge request.
+     */
+    @Getter @Setter @DataBoundSetter
     private boolean triggerOpenMergeRequestOnPush = true;
     private boolean setBuildDescription = true;
     private boolean addNoteOnMergeRequest = true;
-    private final String includeBranchesSpec;
-    private final String excludeBranchesSpec;
+    /**
+     * Branches that will trigger a build on push.
+     */
+    @Getter @Setter @DataBoundSetter
+    private String includeBranchesSpec;
+    /**
+     * Branches that will not trigger a build on push.
+     */
+    @Getter @Setter @DataBoundSetter
+    private String excludeBranchesSpec;
     /**
      * Access token needed for some actions.
      */
-    @Getter @DataBoundSetter
+    @Getter @Setter @DataBoundSetter
     private String token;
 
     @DataBoundConstructor
-    public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOpenMergeRequestOnPush, boolean setBuildDescription,
-                             String includeBranchesSpec, String excludeBranchesSpec) {
-        this.triggerOnPush = triggerOnPush;
-        this.triggerOnMergeRequest = triggerOnMergeRequest;
-        this.triggerOpenMergeRequestOnPush = triggerOpenMergeRequestOnPush;
+    public GitLabPushTrigger(boolean setBuildDescription) {
         this.setBuildDescription = setBuildDescription;
-        this.includeBranchesSpec = includeBranchesSpec;
-        this.excludeBranchesSpec = excludeBranchesSpec;
-    }
-
-    public boolean getTriggerOnPush() {
-        return triggerOnPush;
-    }
-
-    public boolean getTriggerOnMergeRequest() {
-        return triggerOnMergeRequest;
-    }
-
-    public boolean getTriggerOpenMergeRequestOnPush() {
-        return triggerOpenMergeRequestOnPush;
     }
 
     public boolean getSetBuildDescription() {
@@ -144,17 +148,9 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
         return false;
     }
 
-    public String getIncludeBranchesSpec() {
-        return this.includeBranchesSpec;
-    }
-
-    public String getExcludeBranchesSpec() {
-        return this.excludeBranchesSpec;
-    }
-
     public void run(final GitlabPushEvent event) {
         final String branchName = StringUtils.removeStart(event.getRef(), "ref/heads/");
-        if (this.getTriggerOnPush() && this.isBranchAllowed(branchName)) {
+        if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
@@ -181,7 +177,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
     }
 
     public void onPost(final GitLabPushRequest req) {
-        if (triggerOnPush && this.isBranchAllowed(this.getSourceBranch(req))) {
+        if (this.isTriggerOnPush() && this.isBranchAllowed(this.getSourceBranch(req))) {
             getDescriptor().queue.execute(new Runnable() {
 
                 public void run() {
@@ -239,7 +235,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
     }
 
     public void onPost(final GitLabMergeRequest req) {
-        if (triggerOnMergeRequest) {
+        if (this.isTriggerOnMergeRequest()) {
             getDescriptor().queue.execute(new Runnable() {
 
                 public void run() {
