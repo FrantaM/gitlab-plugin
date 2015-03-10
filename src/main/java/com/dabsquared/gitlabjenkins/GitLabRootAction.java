@@ -23,6 +23,9 @@
  */
 package com.dabsquared.gitlabjenkins;
 
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.PropertyNamingStrategy;
+
 import hudson.Extension;
 import hudson.model.UnprotectedRootAction;
 
@@ -35,6 +38,9 @@ import jenkins.model.Jenkins;
  */
 @Extension
 public class GitLabRootAction implements UnprotectedRootAction {
+
+    public static final ObjectMapper JSON = new ObjectMapper()
+            .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
 
     @Override
     public String getIconFileName() {

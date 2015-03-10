@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jackson.JsonNode;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses.HttpResponseException;
@@ -44,8 +45,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 import com.google.common.io.CharStreams;
-
-import net.sf.json.JSONObject;
 
 import hudson.Util;
 import hudson.model.AbstractProject;
@@ -231,15 +230,15 @@ public class JobAction {
     }
 
     public HttpResponse doBuild(final StaplerRequest req) throws IOException {
-        JobAction.validateToken(this.ctx);
-
         final GitLabPushTrigger trigger = findTrigger(this.asJob());
         final String encoding = Objects.firstNonNull(req.getCharacterEncoding(), Charsets.UTF_8.name());
         final String payload = CharStreams.toString(new InputStreamReader(req.getInputStream(), encoding));
-        final JSONObject json = JSONObject.fromObject(payload);
+        final JsonNode json = GitLabRootAction.JSON.readTree(payload);
 
-        if (!json.containsKey("object_kind")) {
-            final GitlabPushEvent event = (GitlabPushEvent) JSONObject.toBean(json, GitlabPushEvent.class);
+        JobAction.validateToken(this.ctx);
+
+        if (!json.has("object_kind")) {
+            final GitlabPushEvent event = GitLabRootAction.JSON.readValue(json, GitlabPushEvent.class);
             if (!event.isTagEvent() && trigger.isTriggerOnPush()) {
                 trigger.run(event);
             }

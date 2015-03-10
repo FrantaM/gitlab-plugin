@@ -149,7 +149,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
     }
 
     public void run(final GitlabPushEvent event) {
-        final String branchName = StringUtils.removeStart(event.getRef(), "ref/heads/");
+        final String branchName = StringUtils.removeStart(event.getRef(), "refs/heads/");
         if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));

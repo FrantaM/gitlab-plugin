@@ -35,12 +35,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
-import net.sf.json.JSONNull;
-import net.sf.json.JSONObject;
+import lombok.Data;
 
 import hudson.model.Fingerprint;
 import hudson.model.Fingerprint.RangeSet;
@@ -61,7 +62,7 @@ import jenkins.model.Jenkins;
  */
 public class RunAction {
 
-    private static Comparator<Run<?, ?>> RUN_COMPARATOR = new Comparator<Run<?, ?>>() {
+    private static final Comparator<Run<?, ?>> RUN_COMPARATOR = new Comparator<Run<?, ?>>() {
 
         @Override
         public int compare(final Run<?, ?> o1, final Run<?, ?> o2) {
@@ -99,31 +100,27 @@ public class RunAction {
     public HttpResponse doStatus() {
         JobAction.validateToken(this.job);
 
-        final JSONObject json = new JSONObject();
-        StatusImage overallStatus = StatusImage.forRun(this.run);
+        final Status status = new Status();
+        status.setStatus(StatusImage.forRun(this.run));
 
         if (run != null) {
-            json.element("id", run.getNumber());
-            json.element("coverage", JSONNull.getInstance());
+            status.setId(run.getNumber());
 
             final Revision lastrev = run.getAction(BuildData.class).getLastBuiltRevision();
             assert lastrev != null;
-            json.element("sha", lastrev.getSha1String());
+            status.setSha(lastrev.getSha1String());
 
             for (final Run<?, ?> downstream : this.findAllRuns()) {
-                json.accumulate("builds", downstream.getFullDisplayName());
-                overallStatus = StatusImage.moreImportant(overallStatus, StatusImage.forRun(downstream));
+                status.addRun(downstream);
             }
         }
-
-        json.element("status", overallStatus.asText());
 
         return new HttpResponse() {
 
             @Override
             public void generateResponse(final StaplerRequest req, final StaplerResponse rsp, final Object node) throws IOException, ServletException {
                 rsp.setContentType("application/json");
-                rsp.getWriter().println(json.toString());
+                rsp.getWriter().println(GitLabRootAction.JSON.writeValueAsString(status));
             }
 
         };
@@ -165,6 +162,33 @@ public class RunAction {
         if (req.getRestOfPath().startsWith("/status")) {
             rsp.forward(this, "status", req);
         }
+    }
+
+    @Data
+    private static final class Status {
+
+        private Integer id;
+        @JsonIgnore
+        private StatusImage status;
+        private Double coverage;
+        private String sha;
+        private List<String> builds;
+
+        public void addRun(final Run<?, ?> run) {
+            final StatusImage si = StatusImage.forRun(run);
+            this.status = this.status == null ? si : StatusImage.moreImportant(this.status, si);
+
+            if (this.builds == null) {
+                this.builds = new ArrayList<String>();
+            }
+            this.builds.add(run.getFullDisplayName());
+        }
+
+        @JsonProperty("status")
+        public final String getStatusText() {
+            return this.getStatus().asText();
+        }
+
     }
 
 }
