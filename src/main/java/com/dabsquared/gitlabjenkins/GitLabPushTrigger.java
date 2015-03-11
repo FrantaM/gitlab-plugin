@@ -59,7 +59,6 @@ import hudson.model.Item;
 import hudson.model.Job;
 import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
-import hudson.model.Result;
 import hudson.model.StringParameterValue;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.RevisionParameterAction;
@@ -98,6 +97,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
     @Getter @Setter @DataBoundSetter
     private boolean triggerOpenMergeRequestOnPush = true;
     private boolean setBuildDescription = true;
+    @Deprecated
     private boolean addNoteOnMergeRequest = true;
     /**
      * Branches that will trigger a build on push.
@@ -124,6 +124,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
         return setBuildDescription;
     }
 
+    @Deprecated
     public boolean getAddNoteOnMergeRequest() {
         return addNoteOnMergeRequest;
     }
@@ -157,7 +158,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
 
-            final GitLabPushCause cause = new GitLabPushCause(event.getUserName());
+            final GitLabPushCause cause = new GitLabPushCause(event);
             this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
         }
     }
@@ -199,24 +200,13 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
                     LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
                     final AbstractProject<?,?> p = (AbstractProject<?,?>)job;
                     String name = " #" + p.getNextBuildNumber();
-                    GitLabPushCause cause = createGitLabPushCause(req);
+                    GitLabPushCause cause = null;
                     Action[] actions = createActions(req);
                     if (p.scheduleBuild(p.getQuietPeriod(), cause, actions)) {
                         LOGGER.log(Level.INFO, "GitLab Push Request detected in {0}. Triggering {1}", new String[] { job.getName(), name });
                     } else {
                         LOGGER.log(Level.INFO, "GitLab Push Request detected in {0}. Job is already in the queue.", job.getName());
                     }
-                }
-
-                private GitLabPushCause createGitLabPushCause(GitLabPushRequest req) {
-                    GitLabPushCause cause;
-                    String triggeredByUser = req.getCommits().get(0).getAuthor().getName();
-                    try {
-                        cause = new GitLabPushCause(triggeredByUser, getLogFile());
-                    } catch (IOException ex) {
-                        cause = new GitLabPushCause(triggeredByUser);
-                    }
-                    return cause;
                 }
 
                 private Action[] createActions(GitLabPushRequest req) {
@@ -332,31 +322,33 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
 
     }
 
+    @Deprecated
     private void onCompleteMergeRequest(AbstractBuild abstractBuild, GitLabMergeCause cause) {
-        if (addNoteOnMergeRequest) {
-            StringBuilder msg = new StringBuilder();
-            if (abstractBuild.getResult() == Result.SUCCESS) {
-                msg.append(":white_check_mark:");
-            } else {
-                msg.append(":anguished:");
-            }
-            msg.append(" Jenkins Build ").append(abstractBuild.getResult().color.getDescription());
-            String buildUrl = Jenkins.getInstance().getRootUrl() + abstractBuild.getUrl();
-            msg.append("\n\nResults available at: ")
-                    .append("[").append("Jenkins").append("](").append(buildUrl).append(")");
-            try {
-                GitlabProject proj = new GitlabProject();
-                proj.setId(cause.getMergeRequest().getObjectAttributes().getTargetProjectId());
-                org.gitlab.api.models.GitlabMergeRequest mr = this.getDescriptor().getGitlab().instance().
-                        getMergeRequest(proj, cause.getMergeRequest().getObjectAttributes().getId());
-                this.getDescriptor().getGitlab().instance().createNote(mr, msg.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+//        if (addNoteOnMergeRequest) {
+//            StringBuilder msg = new StringBuilder();
+//            if (abstractBuild.getResult() == Result.SUCCESS) {
+//                msg.append(":white_check_mark:");
+//            } else {
+//                msg.append(":anguished:");
+//            }
+//            msg.append(" Jenkins Build ").append(abstractBuild.getResult().color.getDescription());
+//            String buildUrl = Jenkins.getInstance().getRootUrl() + abstractBuild.getUrl();
+//            msg.append("\n\nResults available at: ")
+//                    .append("[").append("Jenkins").append("](").append(buildUrl).append(")");
+//            try {
+//                GitlabProject proj = new GitlabProject();
+//                proj.setId(cause.getMergeRequest().getObjectAttributes().getTargetProjectId());
+//                org.gitlab.api.models.GitlabMergeRequest mr = this.getDescriptor().getGitlab().instance().
+//                        getMergeRequest(proj, cause.getMergeRequest().getObjectAttributes().getId());
+//                this.getDescriptor().getGitlab().instance().createNote(mr, msg.toString());
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
 
     }
 
+    @Deprecated
     public void onStarted(AbstractBuild abstractBuild) {
         setBuildCauseInJob(abstractBuild);
     }

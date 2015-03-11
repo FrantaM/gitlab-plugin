@@ -1,38 +1,22 @@
 package com.dabsquared.gitlabjenkins;
 
-import java.io.File;
-import java.io.IOException;
+import javax.annotation.Nonnull;
 
-import hudson.triggers.SCMTrigger;
+import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 
-/**
- * Created by daniel on 6/8/14.
- */
-public class GitLabPushCause extends SCMTrigger.SCMTriggerCause {
+import hudson.model.Cause;
+
+public class GitLabPushCause extends Cause {
 
     private final String pushedBy;
 
-    public GitLabPushCause(String pushedBy) {
-        this.pushedBy = pushedBy;
-    }
-
-    public GitLabPushCause(String pushedBy, File logFile) throws IOException {
-        super(logFile);
-        this.pushedBy = pushedBy;
-    }
-
-    public GitLabPushCause(String pushedBy, String pollingLog) {
-        super(pollingLog);
-        this.pushedBy = pushedBy;
+    public GitLabPushCause(@Nonnull final GitlabPushHook push) {
+        this.pushedBy = push.getUserName();
     }
 
     @Override
     public String getShortDescription() {
-        if (pushedBy == null) {
-            return "Started by GitLab push";
-        } else {
-            return String.format("Started by GitLab push by %s", pushedBy);
-        }
+        return String.format("Started by GitLab Push by %s", this.pushedBy);
     }
 
 }
