@@ -55,12 +55,12 @@ import hudson.util.HttpResponses;
 import jenkins.model.Jenkins;
 
 /**
- * Gitlab actions/info related to a run.
+ * Gitlab actions/info related to a commit.
  *
  * @author Franta Mejta
  * @sa.date 2015-03-09T13:15:09+0100
  */
-public class RunAction {
+public class CommitAction {
 
     private static final Comparator<Run<?, ?>> RUN_COMPARATOR = new Comparator<Run<?, ?>>() {
 
@@ -87,7 +87,7 @@ public class RunAction {
     @Nullable
     private final Run<?, ?> run;
 
-    public RunAction(@Nonnull final Job<?, ?> job, @Nullable final Run<?, ?> run) {
+    public CommitAction(@Nonnull final Job<?, ?> job, @Nullable final Run<?, ?> run) {
         this.job = job;
         this.run = run;
     }

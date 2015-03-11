@@ -220,9 +220,9 @@ public class JobAction {
     }
 
     @Nonnull
-    public RunAction getCommits(final String hash) {
+    public CommitAction getCommits(final String hash) {
         final Run<?, ?> run = this.findRunByHash(hash);
-        return new RunAction(asJob(), run);
+        return new CommitAction(asJob(), run);
     }
 
     public HttpResponse doStatus(@QueryParameter final String ref) {
