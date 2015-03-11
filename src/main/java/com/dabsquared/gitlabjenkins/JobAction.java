@@ -40,7 +40,8 @@ import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
-import com.dabsquared.gitlabjenkins.models.GitlabPushEvent;
+import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
+import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 import com.google.common.base.Charsets;
 import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
@@ -237,8 +238,9 @@ public class JobAction {
 
         JobAction.validateToken(this.ctx);
 
-        if (!json.has("object_kind")) {
-            final GitlabPushEvent event = GitLabRootAction.JSON.readValue(json, GitlabPushEvent.class);
+        final String objectKind = Objects.firstNonNull(Util.fixEmpty(json.path("object_kind").asText()), GitlabPushHook.OBJECT_KIND);
+        if (GitlabPushHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
+            final GitlabPushHook event = GitLabRootAction.JSON.readValue(json, GitlabPushHook.class);
             if (!event.isTagEvent() && trigger.isTriggerOnPush()) {
                 trigger.run(event);
             }

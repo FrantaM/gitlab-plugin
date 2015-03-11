@@ -21,58 +21,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.dabsquared.gitlabjenkins.models;
+package com.dabsquared.gitlabjenkins.models.attrs;
+
+import java.net.URL;
+
+import org.joda.time.DateTime;
 
 import lombok.Data;
 
 /**
- * Push event payload.
+ * Commit attributes.
  *
  * @author Franta Mejta
- * @sa.date 2015-03-09T13:35:20+0100
- * @see http://doc.gitlab.com/ce/web_hooks/web_hooks.html#push-events
  */
 @Data
-public class GitlabPushEvent {
+public class GitlabCommitHookAttrs {
 
-    private String before;
-    private String after;
-    private String ref;
-    private int userId;
-    private String userName;
-    private int projectId;
-    private Repository repository;
-    private Commit[] commits;
-    private int totalCommitsCount;
-
-    public final boolean isTagEvent() {
-        return this.getRef().startsWith("refs/tags/");
-    }
+    private String id;
+    private String message;
+    private DateTime timestamp;
+    private URL url;
+    private Author author;
 
     @Data
-    public static class Repository {
-
-        private String name;
-        private String url;
-        private String description;
-        private String homepage;
-        private String gitHttpUrl;
-        private String gitSshUrl;
-        private int visibilityLevel;
-    }
-
-    @Data
-    public static class Commit {
-
-        private String id;
-        private String message;
-        private String timestamp;
-        private String url;
-        private Author author;
-    }
-
-    @Data
-    public static class Author {
+    public static final class Author {
 
         private String name;
         private String email;

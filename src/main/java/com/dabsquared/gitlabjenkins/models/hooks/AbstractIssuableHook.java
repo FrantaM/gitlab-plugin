@@ -21,46 +21,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.dabsquared.gitlabjenkins;
+package com.dabsquared.gitlabjenkins.models.hooks;
 
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.PropertyNamingStrategy;
+import com.dabsquared.gitlabjenkins.models.attrs.GitlabUserHookAttrs;
 
-import hudson.Extension;
-import hudson.model.UnprotectedRootAction;
-
-import jenkins.model.Jenkins;
+import lombok.Data;
 
 /**
+ * Contains common functionality shared between Issues and MergeRequests.
+ * Used by Issue, MergeRequest.
  *
+ * @param <T> Object type
  * @author Franta Mejta
- * @sa.date 2015-03-06T10:26:06+0100
+ * @see https://gitlab.com/gitlab-org/gitlab-ce/blob/v7.8.3/app/models/concerns/issuable.rb#L135
  */
-@Extension
-public class GitLabRootAction implements UnprotectedRootAction {
+@Data
+public abstract class AbstractIssuableHook<T> {
 
-    public static final ObjectMapper JSON = new ObjectMapper()
-            .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
-
-    @Override
-    public String getIconFileName() {
-        return null;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return null;
-    }
-
-    @Override
-    public String getUrlName() {
-        return "gitlab-ci";
-    }
-
-    public JobAction getJob(final String name) {
-        return JobAction.findJob(Jenkins.getInstance(), name);
-    }
+    private String objectKind;
+    private GitlabUserHookAttrs user;
+    private T objectAttributes;
 
 }

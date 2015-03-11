@@ -21,46 +21,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.dabsquared.gitlabjenkins;
+package com.dabsquared.gitlabjenkins.models.attrs;
 
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.PropertyNamingStrategy;
+import java.net.URL;
 
-import hudson.Extension;
-import hudson.model.UnprotectedRootAction;
-
-import jenkins.model.Jenkins;
+import lombok.Data;
 
 /**
+ * User attributes.
  *
  * @author Franta Mejta
- * @sa.date 2015-03-06T10:26:06+0100
+ * @sa.date 2015-03-11T13:28:15+0100
  */
-@Extension
-public class GitLabRootAction implements UnprotectedRootAction {
+@Data
+public class GitlabUserHookAttrs {
 
-    public static final ObjectMapper JSON = new ObjectMapper()
-            .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
-
-    @Override
-    public String getIconFileName() {
-        return null;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return null;
-    }
-
-    @Override
-    public String getUrlName() {
-        return "gitlab-ci";
-    }
-
-    public JobAction getJob(final String name) {
-        return JobAction.findJob(Jenkins.getInstance(), name);
-    }
-
+    private String name;
+    private String username;
+    private URL avatarUrl;
 }

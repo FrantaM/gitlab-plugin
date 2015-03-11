@@ -21,46 +21,40 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.dabsquared.gitlabjenkins;
+package com.dabsquared.gitlabjenkins.models.attrs;
 
-import org.codehaus.jackson.map.DeserializationConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.PropertyNamingStrategy;
+import org.joda.time.DateTime;
 
-import hudson.Extension;
-import hudson.model.UnprotectedRootAction;
-
-import jenkins.model.Jenkins;
+import lombok.Data;
 
 /**
+ * Merge request attributes.
  *
  * @author Franta Mejta
- * @sa.date 2015-03-06T10:26:06+0100
+ * @sa.date 2015-03-11T13:19:10+0100
  */
-@Extension
-public class GitLabRootAction implements UnprotectedRootAction {
+@Data
+public class GitlabMergeRequestHookAttrs {
 
-    public static final ObjectMapper JSON = new ObjectMapper()
-            .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+    /* hook attributes */
+    private GitlabProjectHookAttrs source;
+    private GitlabProjectHookAttrs target;
+    private GitlabCommitHookAttrs lastCommit;
 
-    @Override
-    public String getIconFileName() {
-        return null;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return null;
-    }
-
-    @Override
-    public String getUrlName() {
-        return "gitlab-ci";
-    }
-
-    public JobAction getJob(final String name) {
-        return JobAction.findJob(Jenkins.getInstance(), name);
-    }
-
+    /* merge request attributes */
+    private Integer id;
+    private String targetBranch;
+    private String sourceBranch;
+    private Integer sourceProjectId;
+    private Integer authorId;
+    private Integer assigneeId;
+    private String title;
+    private DateTime createdAt;
+    private DateTime updatedAt;
+    private Integer milestoneId;
+    private String state;
+    private String mergeStatus;
+    private Integer targetProjectId;
+    private Integer iid;
+    private String description;
 }
