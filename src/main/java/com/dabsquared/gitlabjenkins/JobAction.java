@@ -244,6 +244,11 @@ public class JobAction {
             if (!event.isTagEvent() && trigger.isTriggerOnPush()) {
                 trigger.run(event);
             }
+        } else if (GitlabMergeRequestHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
+            final GitlabMergeRequestHook event = GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class);
+            if (trigger.isTriggerOnMergeRequest()) {
+                trigger.run(event);
+            }
         }
 
         throw HttpResponses.status(HttpServletResponse.SC_BAD_REQUEST);

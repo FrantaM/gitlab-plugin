@@ -23,6 +23,8 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.springframework.util.AntPathMatcher;
 
+import com.dabsquared.gitlabjenkins.models.attrs.GitlabMergeRequestHookAttrs;
+import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -160,6 +162,19 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
         }
     }
 
+    public void run(final GitlabMergeRequestHook event) {
+        final GitlabMergeRequestHookAttrs mr = event.getObjectAttributes();
+        final String branchName = mr.getSourceBranch();
+        if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(branchName)) {
+            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
+            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
+
+            final GitLabMergeCause cause = new GitLabMergeCause(event);
+            this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(mr.getLastCommit().getId()));
+        }
+    }
+
     private void schedule(final Cause cause, final Action... actions) {
         if (job instanceof SCMTriggerItem) {
             final SCMTriggerItem i = (SCMTriggerItem) job;
@@ -242,23 +257,13 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
                     LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
                     final AbstractProject<?,?> p = (AbstractProject<?,?>)job;
                     String name = " #" + p.getNextBuildNumber();
-                    GitLabMergeCause cause = createGitLabMergeCause(req);
+                    GitLabMergeCause cause = null;
                     Action[] actions = createActions(req);
                     if (p.scheduleBuild(p.getQuietPeriod(), cause, actions)) {
                         LOGGER.log(Level.INFO, "GitLab Merge Request detected in {0}. Triggering {1}", new String[] { job.getName(), name });
                     } else {
                         LOGGER.log(Level.INFO, "GitLab Merge Request detected in {0}. Job is already in the queue.", job.getName());
                     }
-                }
-
-                private GitLabMergeCause createGitLabMergeCause(GitLabMergeRequest req) {
-                    GitLabMergeCause cause;
-                    try {
-                        cause = new GitLabMergeCause(req, getLogFile());
-                    } catch (IOException ex) {
-                        cause = new GitLabMergeCause(req);
-                    }
-                    return cause;
                 }
 
                 private Action[] createActions(GitLabMergeRequest req) {
@@ -341,9 +346,9 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
                     .append("[").append("Jenkins").append("](").append(buildUrl).append(")");
             try {
                 GitlabProject proj = new GitlabProject();
-                proj.setId(cause.getMergeRequest().getObjectAttribute().getTargetProjectId());
+                proj.setId(cause.getMergeRequest().getObjectAttributes().getTargetProjectId());
                 org.gitlab.api.models.GitlabMergeRequest mr = this.getDescriptor().getGitlab().instance().
-                        getMergeRequest(proj, cause.getMergeRequest().getObjectAttribute().getId());
+                        getMergeRequest(proj, cause.getMergeRequest().getObjectAttributes().getId());
                 this.getDescriptor().getGitlab().instance().createNote(mr, msg.toString());
             } catch (IOException e) {
                 e.printStackTrace();

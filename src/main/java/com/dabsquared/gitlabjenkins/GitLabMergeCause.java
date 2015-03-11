@@ -1,39 +1,34 @@
 package com.dabsquared.gitlabjenkins;
 
-import java.io.File;
-import java.io.IOException;
+import javax.annotation.Nonnull;
 
-import hudson.triggers.SCMTrigger;
+import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 
-/**
- * Created by daniel on 6/8/14.
- */
-public class GitLabMergeCause extends SCMTrigger.SCMTriggerCause {
+import hudson.model.Cause;
 
-    private GitLabMergeRequest mergeRequest;
+public class GitLabMergeCause extends Cause {
 
-    public GitLabMergeCause(GitLabMergeRequest mergeRequest) {
-        this.mergeRequest = mergeRequest;
-    }
+    private final int requestId;
+    private final String user;
+    private final String sourceBranch;
+    private final String targetBranch;
 
-    public GitLabMergeCause(GitLabMergeRequest mergeRequest, File logFile) throws IOException {
-        super(logFile);
-        this.mergeRequest = mergeRequest;
-    }
-
-    public GitLabMergeCause(GitLabMergeRequest mergeRequest, String pollingLog) {
-        super(pollingLog);
-        this.mergeRequest = mergeRequest;
-    }
-
-    public GitLabMergeRequest getMergeRequest() {
-        return mergeRequest;
+    public GitLabMergeCause(@Nonnull final GitlabMergeRequestHook mr) {
+        this.requestId = mr.getObjectAttributes().getIid();
+        this.user = mr.getUser().getName();
+        this.sourceBranch = mr.getObjectAttributes().getSourceBranch();
+        this.targetBranch = mr.getObjectAttributes().getTargetBranch();
     }
 
     @Override
     public String getShortDescription() {
-        return "GitLab Merge Request #" + this.mergeRequest.getObjectAttribute().getIid() + " : " + this.mergeRequest.getObjectAttribute().getSourceBranch()
-               + " => " + this.mergeRequest.getObjectAttribute().getTargetBranch();
+        if (this.user == null) {
+            return "Started by GitLab Merge Request ";
+        }
+
+        return String.format("Started by GitLab Merge Request #%d by %s: %s => %s",
+                             this.requestId, this.user,
+                             this.sourceBranch, this.targetBranch);
     }
 
 }
