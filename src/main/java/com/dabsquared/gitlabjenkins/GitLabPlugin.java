@@ -24,11 +24,19 @@
 package com.dabsquared.gitlabjenkins;
 
 import hudson.Plugin;
+import hudson.model.Items;
 
 /**
  * @author Franta Mejta
  * @sa.date 2015-03-06T11:09:43+0100
  */
 public class GitLabPlugin extends Plugin {
-    /* no-op */
+
+    @Override
+    public void start() throws Exception {
+        super.start();
+
+        Items.XSTREAM2.addCompatibilityAlias("com.dabsquared.gitlabjenkins.GitLabPushTrigger", GitLabTrigger.class);
+    }
+
 }

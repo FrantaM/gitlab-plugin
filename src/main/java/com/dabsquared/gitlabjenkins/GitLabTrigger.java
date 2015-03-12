@@ -77,9 +77,9 @@ import jenkins.triggers.SCMTriggerItem;
  *
  * @author Daniel Brooks
  */
-public class GitLabPushTrigger extends Trigger<BuildableItem> {
+public class GitLabTrigger extends Trigger<BuildableItem> {
 
-    private static final Logger LOGGER = Logger.getLogger(GitLabPushTrigger.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(GitLabTrigger.class.getName());
     /**
      * Flag whether a push will trigger a build.
      */
@@ -116,7 +116,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
     private String token;
 
     @DataBoundConstructor
-    public GitLabPushTrigger(boolean setBuildDescription) {
+    public GitLabTrigger(boolean setBuildDescription) {
         this.setBuildDescription = setBuildDescription;
     }
 
@@ -377,12 +377,12 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
         return new File(job.getRootDir(), "gitlab-polling.log");
     }
 
-    public static final class ConverterImpl extends XStream2.PassthruConverter<GitLabPushTrigger> {
+    public static final class ConverterImpl extends XStream2.PassthruConverter<GitLabTrigger> {
 
         public ConverterImpl(final XStream2 xstream) {
             super(xstream);
 
-            xstream.registerLocalConverter(GitLabPushTrigger.class, "includeBranchesSpec", new Converter() {
+            xstream.registerLocalConverter(GitLabTrigger.class, "includeBranchesSpec", new Converter() {
 
                 public Object unmarshal(final HierarchicalStreamReader reader, final UnmarshallingContext context) {
                     if ("includeBranchesSpec".equalsIgnoreCase(reader.getNodeName())) {
@@ -415,7 +415,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
 
                     @Override
                     public String realMember(final Class type, final String serialized) {
-                        if (GitLabPushTrigger.class.equals(type)) {
+                        if (GitLabTrigger.class.equals(type)) {
                             if ("allowedBranchesSpec".equalsIgnoreCase(serialized) || "allowedBranches".equalsIgnoreCase(serialized)) {
                                 return "includeBranchesSpec";
                             }
@@ -428,7 +428,7 @@ public class GitLabPushTrigger extends Trigger<BuildableItem> {
         }
 
         @Override
-        protected void callback(final GitLabPushTrigger obj, final UnmarshallingContext context) {
+        protected void callback(final GitLabTrigger obj, final UnmarshallingContext context) {
             /* no-op */
         }
 

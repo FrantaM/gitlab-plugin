@@ -114,11 +114,11 @@ public class JobAction {
      * @throws HttpResponseException HTTP/404 Trigger not found.
      */
     @Nonnull
-    private static GitLabPushTrigger findTrigger(final Job<?, ?> job) {
-        GitLabPushTrigger trigger = null;
+    private static GitLabTrigger findTrigger(final Job<?, ?> job) {
+        GitLabTrigger trigger = null;
         if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
             final ParameterizedJobMixIn.ParameterizedJob pj = (ParameterizedJobMixIn.ParameterizedJob) job;
-            trigger = Iterables.getFirst(Util.filter(pj.getTriggers().values(), GitLabPushTrigger.class), null);
+            trigger = Iterables.getFirst(Util.filter(pj.getTriggers().values(), GitLabTrigger.class), null);
         }
         if (trigger == null) {
             throw HttpResponses.notFound();
@@ -231,7 +231,7 @@ public class JobAction {
     }
 
     public HttpResponse doBuild(final StaplerRequest req) throws IOException {
-        final GitLabPushTrigger trigger = findTrigger(this.asJob());
+        final GitLabTrigger trigger = findTrigger(this.asJob());
         final String encoding = Objects.firstNonNull(req.getCharacterEncoding(), Charsets.UTF_8.name());
         final String payload = CharStreams.toString(new InputStreamReader(req.getInputStream(), encoding));
         final JsonNode json = GitLabRootAction.JSON.readTree(payload);

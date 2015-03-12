@@ -319,7 +319,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
         Authentication old = SecurityContextHolder.getContext().getAuthentication();
         SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
         try {
-            GitLabPushTrigger trigger = (GitLabPushTrigger) project.getTrigger(GitLabPushTrigger.class);
+            GitLabTrigger trigger = (GitLabTrigger) project.getTrigger(GitLabTrigger.class);
             if (trigger == null) {
                 return;
             }
@@ -334,7 +334,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
         }
     }
 
-    protected void buildOpenMergeRequests(GitLabPushTrigger trigger, Integer projectId, String projectRef) {
+    protected void buildOpenMergeRequests(GitLabTrigger trigger, Integer projectId, String projectRef) {
         try {
             GitLab api = new GitLab();
             List<org.gitlab.api.models.GitlabMergeRequest> reqs = api.instance().getMergeRequests(projectId);
@@ -404,7 +404,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
         Authentication old = SecurityContextHolder.getContext().getAuthentication();
         SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
         try {
-            GitLabPushTrigger trigger = (GitLabPushTrigger) project.getTrigger(GitLabPushTrigger.class);
+            GitLabTrigger trigger = (GitLabTrigger) project.getTrigger(GitLabTrigger.class);
             if (trigger == null) {
                 return;
             }
