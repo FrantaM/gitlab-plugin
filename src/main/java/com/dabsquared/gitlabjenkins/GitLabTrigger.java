@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang.StringUtils;
@@ -234,8 +235,8 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                     values.put("gitlabSourceBranch", new StringParameterValue("gitlabSourceBranch", branch));
                     values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", branch));
                     values.put("gitlabBranch", new StringParameterValue("gitlabBranch", branch));
-                    values.put("gitlabSourceRepoName", new StringParameterValue("gitlabSourceRepoName", getDesc().getSourceRepoNameDefault()));
-                    values.put("gitlabSourceRepoURL", new StringParameterValue("gitlabSourceRepoURL", getDesc().getSourceRepoURLDefault().toString()));
+                    values.put("gitlabSourceRepoName", new StringParameterValue("gitlabSourceRepoName", getSourceRepoNameDefault()));
+                    values.put("gitlabSourceRepoURL", new StringParameterValue("gitlabSourceRepoURL", getSourceRepoURLDefault().toString()));
 
                     List<ParameterValue> listValues = new ArrayList<ParameterValue>(values.values());
 
@@ -277,8 +278,8 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                     values.put("gitlabSourceBranch", new StringParameterValue("gitlabSourceBranch", getSourceBranch(req)));
                     values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", req.getObjectAttribute().getTargetBranch()));
 
-                    String sourceRepoName = getDesc().getSourceRepoNameDefault();
-                    String sourceRepoURL = getDesc().getSourceRepoURLDefault().toString();
+                    String sourceRepoName = getSourceRepoNameDefault();
+                    String sourceRepoURL = getSourceRepoURLDefault().toString();
 
                     if (!getDescriptor().getGitlabHostUrl().isEmpty()) {
                         // Get source repository if communication to Gitlab is possible
@@ -305,6 +306,57 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
             });
         }
+    }
+
+    /**
+     * Get the URL of the first declared repository in the project configuration.
+     * Use this as default source repository url.
+     *
+     * @return URIish the default value of the source repository url
+     * @throws IllegalStateException Project does not use git scm.
+     */
+    @Nullable
+    protected static URIish getSourceRepoURLDefault(final Job<?, ?> job) throws IllegalStateException {
+        SCM scm = ((AbstractProject<?, ?>) job).getScm();
+        if (!(scm instanceof GitSCM)) {
+            throw new IllegalStateException("This repo does not use git.");
+        }
+
+        List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
+        if (!repositories.isEmpty()) {
+            RemoteConfig defaultRepository = repositories.get(repositories.size() - 1);
+            List<URIish> uris = defaultRepository.getURIs();
+            if (!uris.isEmpty()) {
+                return uris.get(uris.size() - 1);
+            }
+        }
+
+        return null;
+    }
+
+    protected URIish getSourceRepoURLDefault() throws IllegalStateException {
+        return getSourceRepoURLDefault((Job<?, ?>) this.job);
+    }
+
+    /**
+     * Get the Name of the first declared repository in the project configuration.
+     * Use this as default source repository Name.
+     *
+     * @return String with the default name of the source repository
+     */
+    protected String getSourceRepoNameDefault() {
+        String result = null;
+        SCM scm = ((AbstractProject<?, ?>) job).getScm();
+        if (!(scm instanceof GitSCM)) {
+            throw new IllegalArgumentException("This repo does not use git.");
+        }
+        if (scm instanceof GitSCM) {
+            List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
+            if (!repositories.isEmpty()) {
+                return repositories.get(repositories.size() - 1).getName();
+            }
+        }
+        return null;
     }
 
     private void setBuildCauseInJob(AbstractBuild abstractBuild) {
@@ -451,11 +503,12 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     @Extension
     public static class DescriptorImpl extends TriggerDescriptor {
 
-        AbstractProject project;
         private String gitlabApiToken;
         private String gitlabHostUrl = "";
         private boolean ignoreCertificateErrors = false;
+        @Deprecated
         private transient final SequentialExecutionQueue queue = new SequentialExecutionQueue(Jenkins.MasterComputer.threadPoolForRemoting);
+        @Deprecated
         private transient GitLab gitlab;
 
         public DescriptorImpl() {
@@ -463,13 +516,8 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         }
 
         @Override
-        public boolean isApplicable(Item item) {
-            if (item instanceof AbstractProject) {
-                project = (AbstractProject) item;
-                return true;
-            } else {
-                return false;
-            }
+        public boolean isApplicable(final Item item) {
+            return item instanceof BuildableItem;
         }
 
         @Override
@@ -477,29 +525,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             return "Build when a change is pushed to GitLab";
         }
 
-        public String getHookUrl() {
-            final List<String> projectParentsUrl = new ArrayList<String>();
-
-            try {
-                for (Object parent = project.getParent(); parent instanceof Item; parent = ((Item) parent)
-                     .getParent()) {
-                    projectParentsUrl.add(0, ((Item) parent).getName());
-                }
-            } catch (IllegalStateException e) {
-                return "Build when a change is pushed to GitLab, unknown URL";
-            }
-
-            final StringBuilder projectUrl = new StringBuilder();
-            projectUrl.append(Jenkins.getInstance().getRootUrl());
-            projectUrl.append(GitLabWebHook.WEBHOOK_URL);
-            projectUrl.append('/');
-            for (final String parentUrl : projectParentsUrl) {
-                projectUrl.append(Util.rawEncode(parentUrl));
-                projectUrl.append('/');
-            }
-            projectUrl.append(Util.rawEncode(project.getName()));
-
-            return projectUrl.toString();
+        public String getHookUrl(@AncestorInPath final Job<?, ?> job) {
+            return Util.ensureEndsWith(Jenkins.getActiveInstance().getRootUrl(), "/")
+                   + Util.ensureEndsWith(GitLabRootAction.URL_NAME, "/")
+                   + job.getUrl();
         }
 
         @Override
@@ -512,8 +541,8 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             return super.configure(req, formData);
         }
 
-        private List<String> getProjectBranches() throws IOException, IllegalStateException {
-            final URIish sourceRepository = getSourceRepoURLDefault();
+        private List<String> getProjectBranches(@Nonnull final Job<?, ?> job) throws IOException, IllegalStateException {
+            final URIish sourceRepository = getSourceRepoURLDefault(job);
             if (sourceRepository == null) {
                 throw new IllegalStateException(Messages.GitLabPushTrigger_NoSourceRepository());
             }
@@ -554,10 +583,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             return Lists.newArrayList(Splitter.on(',').omitEmptyStrings().trimResults().split(spec));
         }
 
-        private AutoCompletionCandidates doAutoCompleteBranchesSpec() {
+        private AutoCompletionCandidates doAutoCompleteBranchesSpec(@Nonnull final Job<?, ?> job) {
             final AutoCompletionCandidates ac = new AutoCompletionCandidates();
             try {
-                ac.getValues().addAll(this.getProjectBranches());
+                ac.getValues().addAll(this.getProjectBranches(job));
             } catch (final IllegalStateException ex) {
                 /* no-op */
             } catch (final IOException ex) {
@@ -567,12 +596,12 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             return ac;
         }
 
-        public AutoCompletionCandidates doAutoCompleteIncludeBranchesSpec() {
-            return this.doAutoCompleteBranchesSpec();
+        public AutoCompletionCandidates doAutoCompleteIncludeBranchesSpec(@AncestorInPath final Job<?, ?> job) {
+            return this.doAutoCompleteBranchesSpec(job);
         }
 
-        public AutoCompletionCandidates doAutoCompleteExcludeBranchesSpec() {
-            return this.doAutoCompleteBranchesSpec();
+        public AutoCompletionCandidates doAutoCompleteExcludeBranchesSpec(@AncestorInPath final Job<?, ?> job) {
+            return this.doAutoCompleteBranchesSpec(job);
         }
 
         private FormValidation doCheckBranchesSpec(@AncestorInPath final Job<?, ?> project, @QueryParameter final String value) {
@@ -587,7 +616,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
             final List<String> projectBranches;
             try {
-                projectBranches = this.getProjectBranches();
+                projectBranches = this.getProjectBranches(project);
             } catch (final IllegalStateException ex) {
                 return FormValidation.warning(Messages.GitLabPushTrigger_CannotConnectToGitLab(ex.getMessage()));
             } catch (final IOException ex) {
@@ -625,53 +654,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
         public FormValidation doCheckToken(@QueryParameter final String value) {
             return FormValidation.validateRequired(value);
-        }
-
-        /**
-         * Get the URL of the first declared repository in the project configuration.
-         * Use this as default source repository url.
-         *
-         * @return URIish the default value of the source repository url
-         * @throws IllegalStateException Project does not use git scm.
-         */
-        @Nullable
-        protected URIish getSourceRepoURLDefault() throws IllegalStateException {
-            SCM scm = project.getScm();
-            if (!(scm instanceof GitSCM)) {
-                throw new IllegalStateException("This repo does not use git.");
-            }
-
-            List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
-            if (!repositories.isEmpty()) {
-                RemoteConfig defaultRepository = repositories.get(repositories.size() - 1);
-                List<URIish> uris = defaultRepository.getURIs();
-                if (!uris.isEmpty()) {
-                    return uris.get(uris.size() - 1);
-                }
-            }
-
-            return null;
-        }
-
-        /**
-         * Get the Name of the first declared repository in the project configuration.
-         * Use this as default source repository Name.
-         *
-         * @return String with the default name of the source repository
-         */
-        protected String getSourceRepoNameDefault() {
-            String result = null;
-            SCM scm = project.getScm();
-            if (!(scm instanceof GitSCM)) {
-                throw new IllegalArgumentException("This repo does not use git.");
-            }
-            if (scm instanceof GitSCM) {
-                List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
-                if (!repositories.isEmpty()) {
-                    result = repositories.get(repositories.size() - 1).getName();
-                }
-            }
-            return result;
         }
 
         public FormValidation doCheckGitlabHostUrl(@QueryParameter String value) {

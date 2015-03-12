@@ -43,6 +43,7 @@ public class GitLabRootAction implements UnprotectedRootAction {
     public static final ObjectMapper JSON = new ObjectMapper()
             .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+    public static final String URL_NAME = "gitlab-ci";
 
     @Override
     public String getIconFileName() {
@@ -56,7 +57,7 @@ public class GitLabRootAction implements UnprotectedRootAction {
 
     @Override
     public String getUrlName() {
-        return "gitlab-ci";
+        return GitLabRootAction.URL_NAME;
     }
 
     public JobAction getJob(final String name) {
