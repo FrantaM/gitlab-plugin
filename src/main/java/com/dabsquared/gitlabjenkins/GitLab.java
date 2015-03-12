@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 
 import org.gitlab.api.GitlabAPI;
 
+@Deprecated
 public class GitLab {
 
     private static final Logger LOGGER = Logger.getLogger(GitLab.class.getName());

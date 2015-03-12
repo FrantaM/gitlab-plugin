@@ -2,6 +2,8 @@ package com.dabsquared.gitlabjenkins;
 
 import javax.annotation.Nonnull;
 
+import org.gitlab.api.models.GitlabMergeRequest;
+
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 
 import hudson.model.Cause;
@@ -18,6 +20,13 @@ public class GitLabMergeCause extends Cause {
         this.user = mr.getUser().getName();
         this.sourceBranch = mr.getObjectAttributes().getSourceBranch();
         this.targetBranch = mr.getObjectAttributes().getTargetBranch();
+    }
+
+    public GitLabMergeCause(@Nonnull final GitlabMergeRequest mr) {
+        this.requestId = mr.getIid();
+        this.user = mr.getAuthor().getName();
+        this.sourceBranch = mr.getSourceBranch();
+        this.targetBranch = mr.getTargetBranch();
     }
 
     @Override

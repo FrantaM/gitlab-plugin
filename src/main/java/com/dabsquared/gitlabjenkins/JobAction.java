@@ -25,6 +25,7 @@ package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -33,6 +34,9 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jackson.JsonNode;
 import org.eclipse.jgit.transport.RemoteConfig;
+import org.gitlab.api.GitlabAPI;
+import org.gitlab.api.models.GitlabMergeRequest;
+import org.gitlab.api.models.GitlabProject;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses.HttpResponseException;
 import org.kohsuke.stapler.QueryParameter;
@@ -46,6 +50,8 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 import com.google.common.io.CharStreams;
+
+import lombok.extern.java.Log;
 
 import hudson.Util;
 import hudson.model.AbstractProject;
@@ -67,6 +73,7 @@ import jenkins.model.ParameterizedJobMixIn;
  * @author Franta Mejta
  * @sa.date 2015-03-09T13:13:54+0100
  */
+@Log
 public class JobAction {
 
     /**
@@ -241,17 +248,30 @@ public class JobAction {
         final String objectKind = Objects.firstNonNull(Util.fixEmpty(json.path("object_kind").asText()), GitlabPushHook.OBJECT_KIND);
         if (GitlabPushHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             final GitlabPushHook event = GitLabRootAction.JSON.readValue(json, GitlabPushHook.class);
-            if (!event.isTagEvent() && trigger.isTriggerOnPush()) {
+            if (trigger.isTriggerOpenMergeRequestOnPush()) {
+                final GitlabAPI api = trigger.getDescriptor().newGitlabConnection();
+                if (api != null) {
+                    final GitlabProject gp = api.getProject(event.getProjectId());
+                    for (final GitlabMergeRequest mr : api.getOpenMergeRequests(gp)) {
+                        if (event.getRef().endsWith(mr.getSourceBranch())) {
+                            trigger.run(mr);
+                        }
+                    }
+                } else {
+                    log.fine(String.format("Gitlab API access not available; will not build open merge "
+                                           + "request from branch %s if there are any.", event.getRef()));
+                }
+            }
+            if (!event.isTagEvent()) {
                 trigger.run(event);
             }
         } else if (GitlabMergeRequestHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
-            final GitlabMergeRequestHook event = GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class);
-            if (trigger.isTriggerOnMergeRequest()) {
-                trigger.run(event);
-            }
+            trigger.run(GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class));
+        } else {
+            throw HttpResponses.status(HttpServletResponse.SC_BAD_REQUEST);
         }
 
-        throw HttpResponses.status(HttpServletResponse.SC_BAD_REQUEST);
+        return HttpResponses.ok();
     }
 
     public void doDynamic(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException {

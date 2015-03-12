@@ -14,7 +14,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
+import org.gitlab.api.GitlabAPI;
 import org.gitlab.api.models.GitlabBranch;
+import org.gitlab.api.models.GitlabMergeRequest;
 import org.gitlab.api.models.GitlabProject;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -176,6 +178,18 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         }
     }
 
+    public void run(final GitlabMergeRequest mr) {
+        final String branchName = mr.getSourceBranch();
+        if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(branchName)) {
+            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
+            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
+
+            final GitLabMergeCause cause = new GitLabMergeCause(mr);
+            this.schedule(cause, new ParametersAction(parameters));
+        }
+    }
+
     private void schedule(final Cause cause, final Action... actions) {
         if (job instanceof SCMTriggerItem) {
             final SCMTriggerItem i = (SCMTriggerItem) job;
@@ -198,7 +212,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
                 public void run() {
                     LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
-                    final AbstractProject<?,?> p = (AbstractProject<?,?>)job;
+                    final AbstractProject<?, ?> p = (AbstractProject<?, ?>) job;
                     String name = " #" + p.getNextBuildNumber();
                     GitLabPushCause cause = null;
                     Action[] actions = createActions(req);
@@ -245,7 +259,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
                 public void run() {
                     LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
-                    final AbstractProject<?,?> p = (AbstractProject<?,?>)job;
+                    final AbstractProject<?, ?> p = (AbstractProject<?, ?>) job;
                     String name = " #" + p.getNextBuildNumber();
                     GitLabMergeCause cause = null;
                     Action[] actions = createActions(req);
@@ -685,6 +699,26 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             }
         }
 
+        @Nullable
+        public GitlabAPI newGitlabConnection() {
+            if (this.getGitlabHostUrl() != null && this.getGitlabApiToken() != null) {
+                try {
+                    final GitlabAPI api = GitlabAPI.connect(this.getGitlabHostUrl(), this.getGitlabApiToken());
+                    api.ignoreCertificateErrors(this.getIgnoreCertificateErrors());
+                    api.getCurrentSession();
+
+                    return api;
+                } catch (final IOException ex) {
+                    LOGGER.log(Level.WARNING, "Gitlab API access not available.", ex);
+                    return null;
+                }
+            } else {
+                LOGGER.fine("Gitlab host url and/or api token not supplied, cannot create api connection.");
+                return null;
+            }
+        }
+
+        @Deprecated
         public GitLab getGitlab() {
             if (gitlab == null) {
                 gitlab = new GitLab();
