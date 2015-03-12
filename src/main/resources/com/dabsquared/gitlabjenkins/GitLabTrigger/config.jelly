@@ -1,29 +1,31 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-    <f:entry title="${%Access Token}" field="token">
+    <f:entry title="${%Token}" field="token">
         <f:textbox />
     </f:entry>
-    <f:entry title="Build on Merge Request Events" field="triggerOnMergeRequest">
-        <f:checkbox default="true" />
+    <f:entry title="${%Project url}">
+        ${descriptor.hookUrl}
     </f:entry>
-    <f:entry title="Build on Push Events" field="triggerOnPush">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Rebuild open Merge Requests on Push Events" field="triggerOpenMergeRequestOnPush">
-      <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Set build description to build cause (eg. Merge request or Git Push )" field="setBuildDescription">
-      <f:checkbox default="true" />
-    </f:entry>
-    <f:entry title="Add note with build status on merge requests" field="addNoteOnMergeRequest">
-        <f:checkbox default="true" />
-    </f:entry>
-    <f:optionalBlock title="Filter branches" help="/plugin/gitlab-plugin/help/help-allowedBranches.html"
-                     inline="true" checked="${not (empty(instance.includeBranchesSpec) and empty(instance.excludeBranchesSpec))}">
-        <f:entry title="Include">
+    <f:advanced>
+        <f:entry title="Build on Merge Request Events" field="triggerOnMergeRequest">
+            <f:checkbox default="true" />
+        </f:entry>
+        <f:entry title="Build on Push Events" field="triggerOnPush">
+            <f:checkbox default="true" />
+        </f:entry>
+        <f:entry title="Rebuild open Merge Requests on Push Events" field="triggerOpenMergeRequestOnPush">
+            <f:checkbox default="true" />
+        </f:entry>
+        <f:entry title="Set build description to build cause (eg. Merge request or Git Push )" field="setBuildDescription">
+            <f:checkbox default="true" />
+        </f:entry>
+        <f:entry title="Add note with build status on merge requests" field="addNoteOnMergeRequest">
+            <f:checkbox default="true" />
+        </f:entry>
+        <f:entry title="${%Include branches}">
             <f:textbox field="includeBranchesSpec" autocompleteDelimChar="," />
         </f:entry>
-        <f:entry title="Exclude">
+        <f:entry title="${%Exclude branches}">
             <f:textbox field="excludeBranchesSpec" autocompleteDelimChar="," />
         </f:entry>
-    </f:optionalBlock>
+    </f:advanced>
 </j:jelly>

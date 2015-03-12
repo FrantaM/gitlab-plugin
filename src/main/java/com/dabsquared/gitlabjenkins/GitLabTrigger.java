@@ -474,10 +474,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
         @Override
         public String getDisplayName() {
-            if (project == null) {
-                return "Build when a change is pushed to GitLab, unknown URL";
-            }
+            return "Build when a change is pushed to GitLab";
+        }
 
+        public String getHookUrl() {
             final List<String> projectParentsUrl = new ArrayList<String>();
 
             try {
@@ -488,6 +488,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             } catch (IllegalStateException e) {
                 return "Build when a change is pushed to GitLab, unknown URL";
             }
+
             final StringBuilder projectUrl = new StringBuilder();
             projectUrl.append(Jenkins.getInstance().getRootUrl());
             projectUrl.append(GitLabWebHook.WEBHOOK_URL);
@@ -498,7 +499,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             }
             projectUrl.append(Util.rawEncode(project.getName()));
 
-            return "Build when a change is pushed to GitLab. GitLab CI Service URL: " + projectUrl;
+            return projectUrl.toString();
         }
 
         @Override
