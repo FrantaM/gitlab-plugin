@@ -13,6 +13,7 @@ import hudson.triggers.Trigger;
  * Will lookup GitLabPushTrigger and call onStarted and onCompleted methods
  * in order to have access to the build and set properties.
  */
+@Deprecated
 @Extension
 public class GitLabRunListener extends RunListener<AbstractBuild> {
 

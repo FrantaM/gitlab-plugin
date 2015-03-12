@@ -10,6 +10,7 @@ import org.apache.commons.lang.builder.ToStringStyle;
  *
  * @author Daniel Brooks
  */
+@Deprecated
 public class GitLabPushRequest extends GitLabRequest {
 
     public static GitLabPushRequest create(String payload) {

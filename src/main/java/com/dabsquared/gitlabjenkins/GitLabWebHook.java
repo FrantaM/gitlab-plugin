@@ -49,6 +49,7 @@ import jenkins.model.Jenkins;
  *
  * @author Daniel Brooks
  */
+@Deprecated
 @Extension
 public class GitLabWebHook implements UnprotectedRootAction {
 

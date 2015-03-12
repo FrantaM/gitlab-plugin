@@ -12,6 +12,7 @@ import org.gitlab.api.models.GitlabProject;
  *
  * @author Daniel Brooks
  */
+@Deprecated
 public class GitLabMergeRequest extends GitLabRequest {
 
     public static GitLabMergeRequest create(String payload) {
