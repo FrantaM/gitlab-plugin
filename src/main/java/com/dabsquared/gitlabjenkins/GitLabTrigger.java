@@ -489,7 +489,40 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         private boolean ignoreCertificateErrors;
 
         public DescriptorImpl() {
-            load();
+            this.loadOldConfigFile();
+            this.load();
+        }
+
+        private void loadOldConfigFile() {
+            final XmlFile ncf = this.getConfigFile();
+            final XmlFile[] oca = this.getOldConfigFile();
+
+            for (int i = 0, max = oca.length; i < max; ++i) {
+                final XmlFile oc = oca[i];
+                final XmlFile nc = (i + 1) < max ? oca[i + 1] : ncf;
+                if (!nc.exists()) {
+                    if (oc.exists()) {
+                        if (!oc.getFile().renameTo(nc.getFile())) {
+                            LOGGER.severe(String.format("Cannot move old configuration from %s to %s", oc, nc));
+                        }
+                    }
+                } else {
+                    if (oc.exists()) {
+                        LOGGER.fine(String.format("Removing stale configuration file %s", oc));
+                        oc.delete();
+                    }
+                }
+
+                final XStream2 xs = (XStream2) ncf.getXStream();
+                xs.addCompatibilityAlias(Util.changeExtension(oc.getFile(), "$DescriptorImpl").getName(), DescriptorImpl.class);
+            }
+        }
+
+        private XmlFile[] getOldConfigFile() {
+            final File rd = Jenkins.getActiveInstance().getRootDir();
+            return new XmlFile[] {
+                new XmlFile(new File(rd, "com.dabsquared.gitlabjenkins.GitLabPushTrigger.xml"))
+            };
         }
 
         @Override
