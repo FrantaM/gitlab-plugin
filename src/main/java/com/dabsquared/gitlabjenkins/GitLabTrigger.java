@@ -563,7 +563,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         public String getHookUrl(@AncestorInPath final Job<?, ?> job) {
             return Util.ensureEndsWith(Jenkins.getActiveInstance().getRootUrl(), "/")
                    + Util.ensureEndsWith(GitLabRootAction.URL_NAME, "/")
-                   + job.getUrl();
+                   + Util.removeTrailingSlash(job.getUrl());
         }
 
         @Override

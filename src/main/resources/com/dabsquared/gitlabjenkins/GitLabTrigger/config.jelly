@@ -3,7 +3,7 @@
         <f:textbox />
     </f:entry>
     <f:entry title="${%Project url}">
-        ${descriptor.hookUrl}
+        ${descriptor.getHookUrl(it)}
     </f:entry>
     <f:advanced>
         <f:entry title="Build on Merge Request Events" field="triggerOnMergeRequest">
