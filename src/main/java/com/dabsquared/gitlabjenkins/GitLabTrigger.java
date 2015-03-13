@@ -690,7 +690,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         public GitlabAPI newGitlabConnection() {
             if (this.getGitlabHostUrl() != null && this.getGitlabApiToken() != null) {
                 try {
-                    return this.newGitLabConnection(this.getGitlabHostUrl(), this.getGitlabHostUrl(), this.isIgnoreCertificateErrors());
+                    return this.newGitLabConnection(this.getGitlabHostUrl(), this.getGitlabApiToken(), this.isIgnoreCertificateErrors());
                 } catch (final IOException ex) {
                     LOGGER.log(Level.WARNING, "Gitlab API access not available.", ex);
                     return null;
