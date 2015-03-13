@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -46,6 +44,7 @@ import net.sf.json.JSONObject;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 import hudson.Extension;
 import hudson.Util;
@@ -78,9 +77,9 @@ import jenkins.triggers.SCMTriggerItem;
  *
  * @author Daniel Brooks
  */
+@Slf4j
 public class GitLabTrigger extends Trigger<BuildableItem> {
 
-    private static final Logger LOGGER = Logger.getLogger(GitLabTrigger.class.getName());
     /**
      * Flag whether a push will trigger a build.
      */
@@ -159,6 +158,9 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
 
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(branchName));
+
             final GitLabPushCause cause = new GitLabPushCause(event);
             this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
         }
@@ -172,6 +174,11 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(mr.getTargetBranch()));
+            parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(mr.getSource().getSshUrl()));
+            parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(mr.getSource().getHttpUrl()));
+
             final GitLabMergeCause cause = new GitLabMergeCause(event);
             this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(mr.getLastCommit().getId()));
         }
@@ -184,8 +191,26 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
-            final GitLabMergeCause cause = new GitLabMergeCause(mr);
-            this.schedule(cause, new ParametersAction(parameters));
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(mr.getTargetBranch()));
+
+            final GitlabAPI api = this.getDescriptor().newGitlabConnection();
+            if (api != null) {
+                try {
+                    final GitlabProject source = api.getProject(mr.getSourceProjectId());
+                    if (source != null) {
+                        parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(source.getSshUrl()));
+                        parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(source.getHttpUrl()));
+
+                        final GitLabMergeCause cause = new GitLabMergeCause(mr);
+                        this.schedule(cause, new ParametersAction(parameters));
+                    } else {
+                        log.warn("Cannot find source project #{} (insufficient permissions?)", mr.getSourceProjectId());
+                    }
+                } catch (final IOException ex) {
+                    log.warn("Cannot fetch source project #{}", mr.getSourceProjectId(), ex);
+                }
+            }
         }
     }
 
@@ -200,7 +225,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             final AbstractProject<?, ?> i = (AbstractProject<?, ?>) job;
             i.scheduleBuild2(i.getQuietPeriod(), cause, actions);
         } else {
-            LOGGER.severe(String.format("Cannot pass actions to job %s.", job));
+            log.warn("Cannot pass actions to job {}.", job);
             job.scheduleBuild(cause);
         }
     }
@@ -503,12 +528,12 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 if (!nc.exists()) {
                     if (oc.exists()) {
                         if (!oc.getFile().renameTo(nc.getFile())) {
-                            LOGGER.severe(String.format("Cannot move old configuration from %s to %s", oc, nc));
+                            log.warn("Cannot move old configuration from %s to %s", oc, nc);
                         }
                     }
                 } else {
                     if (oc.exists()) {
-                        LOGGER.fine(String.format("Removing stale configuration file %s", oc));
+                        log.info("Removing stale configuration file %s", oc);
                         oc.delete();
                     }
                 }
@@ -527,7 +552,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
         @Override
         public boolean isApplicable(final Item item) {
-            return item instanceof BuildableItem;
+            return SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(item) != null;
         }
 
         @Override
@@ -692,11 +717,11 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 try {
                     return this.newGitLabConnection(this.getGitlabHostUrl(), this.getGitlabApiToken(), this.isIgnoreCertificateErrors());
                 } catch (final IOException ex) {
-                    LOGGER.log(Level.WARNING, "Gitlab API access not available.", ex);
+                    log.warn("Gitlab API access not available.", ex);
                     return null;
                 }
             } else {
-                LOGGER.fine("Gitlab host url and/or api token not supplied, cannot create api connection.");
+                log.debug("Gitlab host url and/or api token not supplied, cannot create api connection.");
                 return null;
             }
         }
