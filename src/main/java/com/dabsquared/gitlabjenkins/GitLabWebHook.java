@@ -2,7 +2,6 @@ package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.logging.Logger;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -11,16 +10,16 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.DoNotUse;
-import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 
+import lombok.extern.java.Log;
+
 import hudson.Extension;
 import hudson.model.AbstractProject;
-import hudson.model.Item;
 import hudson.model.ItemGroup;
 import hudson.model.UnprotectedRootAction;
 import hudson.security.ACL;
@@ -30,15 +29,10 @@ import hudson.util.HttpResponses;
 import jenkins.model.Jenkins;
 
 /**
- *
  * @author Daniel Brooks
  */
-@Extension
-@Deprecated
-@Restricted(DoNotUse.class)
+@Log @Extension @Deprecated @Restricted(DoNotUse.class)
 public class GitLabWebHook implements UnprotectedRootAction {
-
-    private static final Logger LOGGER = Logger.getLogger(GitLabWebHook.class.getName());
 
     public static final String WEBHOOK_URL = "project";
 
@@ -80,7 +74,7 @@ public class GitLabWebHook implements UnprotectedRootAction {
         if (project == null) {
             throw HttpResponses.notFound();
         } else {
-            LOGGER.severe(String.format("Old hook is still used by %s.", req.getRemoteHost()));
+            log.severe(String.format("Old hook is still used by %s (project %s).", req.getRemoteHost(), project.getFullName()));
             final Object newAction = Jenkins.getActiveInstance().getDynamic(GitLabRootAction.URL_NAME);
             rsp.forward(newAction, project.getUrl() + Joiner.on('/').join(restOfPathParts), req);
         }

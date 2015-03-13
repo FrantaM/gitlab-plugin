@@ -25,7 +25,6 @@ package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
