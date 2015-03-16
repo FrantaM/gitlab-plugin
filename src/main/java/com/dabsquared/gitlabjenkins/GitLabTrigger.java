@@ -23,6 +23,8 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.springframework.util.AntPathMatcher;
 
 import com.dabsquared.gitlabjenkins.models.attrs.GitlabMergeRequestHookAttrs;
+import com.dabsquared.gitlabjenkins.models.attrs.GitlabMergeRequestHookAttrs.MergeStatus;
+import com.dabsquared.gitlabjenkins.models.attrs.GitlabMergeRequestHookAttrs.State;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 import com.google.common.base.Joiner;
@@ -176,6 +178,15 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
         final String branchName = mr.getSourceBranch();
         if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(branchName)) {
+            if (mr.getState() != State.OPENED && mr.getState() != State.REOPENED) {
+                log.info("Skipping merge request #{} because it's not open.", mr.getIid());
+                return;
+            }
+            if (mr.getMergeStatus() == MergeStatus.CANNOT_BE_MERGED) {
+                log.info("Skipping merge request #{} because it cannot be merged.", mr.getIid());
+                return;
+            }
+
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
