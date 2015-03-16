@@ -23,6 +23,9 @@
  */
 package com.dabsquared.gitlabjenkins.models.attrs;
 
+import java.util.Locale;
+
+import org.codehaus.jackson.annotate.JsonCreator;
 import org.joda.time.DateTime;
 
 import lombok.Data;
@@ -52,9 +55,32 @@ public class GitlabMergeRequestHookAttrs {
     private DateTime createdAt;
     private DateTime updatedAt;
     private Integer milestoneId;
-    private String state;
-    private String mergeStatus;
+    private State state;
+    private MergeStatus mergeStatus;
     private Integer targetProjectId;
     private Integer iid;
     private String description;
+
+    public enum State {
+
+        OPENED, REOPENED, CLOSED, MERGED, LOCKED;
+
+        @JsonCreator
+        public static State fromJson(final String value) {
+            return State.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+
+    }
+
+    public enum MergeStatus {
+
+        UNCHECKED, CAN_BE_MERGED, CANNOT_BE_MERGED;
+
+        @JsonCreator
+        public static MergeStatus fromJson(final String value) {
+            return MergeStatus.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+
+    }
+
 }
