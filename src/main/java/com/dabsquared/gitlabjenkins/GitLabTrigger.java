@@ -99,8 +99,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     @Getter @Setter @DataBoundSetter
     private boolean triggerOpenMergeRequestOnPush = true;
     private boolean setBuildDescription = true;
-    @Deprecated
-    private boolean addNoteOnMergeRequest = true;
     /**
      * Branches that will trigger a build on push.
      */
@@ -124,11 +122,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
     public boolean getSetBuildDescription() {
         return setBuildDescription;
-    }
-
-    @Deprecated
-    public boolean getAddNoteOnMergeRequest() {
-        return addNoteOnMergeRequest;
     }
 
     private boolean isBranchAllowed(final String branchName) {
@@ -197,7 +190,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(mr.getSource().getHttpUrl()));
 
             final GitLabMergeCause cause = new GitLabMergeCause(event);
-            this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(mr.getLastCommit().getId()));
+            this.schedule(cause, new ParametersAction(parameters));
         }
     }
 
@@ -419,40 +412,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         }
     }
 
-    public void onCompleted(AbstractBuild build) {
-        Cause mCause = build.getCause(GitLabMergeCause.class);
-        if (mCause != null && mCause instanceof GitLabMergeCause) {
-            onCompleteMergeRequest(build, (GitLabMergeCause) mCause);
-        }
-
-    }
-
-    @Deprecated
-    private void onCompleteMergeRequest(AbstractBuild abstractBuild, GitLabMergeCause cause) {
-//        if (addNoteOnMergeRequest) {
-//            StringBuilder msg = new StringBuilder();
-//            if (abstractBuild.getResult() == Result.SUCCESS) {
-//                msg.append(":white_check_mark:");
-//            } else {
-//                msg.append(":anguished:");
-//            }
-//            msg.append(" Jenkins Build ").append(abstractBuild.getResult().color.getDescription());
-//            String buildUrl = Jenkins.getInstance().getRootUrl() + abstractBuild.getUrl();
-//            msg.append("\n\nResults available at: ")
-//                    .append("[").append("Jenkins").append("](").append(buildUrl).append(")");
-//            try {
-//                GitlabProject proj = new GitlabProject();
-//                proj.setId(cause.getMergeRequest().getObjectAttributes().getTargetProjectId());
-//                org.gitlab.api.models.GitlabMergeRequest mr = this.getDescriptor().getGitlab().instance().
-//                        getMergeRequest(proj, cause.getMergeRequest().getObjectAttributes().getId());
-//                this.getDescriptor().getGitlab().instance().createNote(mr, msg.toString());
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-
-    }
-
     @Deprecated
     public void onStarted(AbstractBuild abstractBuild) {
         setBuildCauseInJob(abstractBuild);
@@ -502,7 +461,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             synchronized (xstream) {
                 xstream.setMapper(new MapperWrapper(xstream.getMapperInjectionPoint()) {
 
-                    @Override
+                    @Override @SuppressWarnings("rawtypes")
                     public String realMember(final Class type, final String serialized) {
                         if (GitLabTrigger.class.equals(type)) {
                             if ("allowedBranchesSpec".equalsIgnoreCase(serialized) || "allowedBranches".equalsIgnoreCase(serialized)) {

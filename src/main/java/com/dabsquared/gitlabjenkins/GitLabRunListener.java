@@ -1,7 +1,5 @@
 package com.dabsquared.gitlabjenkins;
 
-import javax.annotation.Nonnull;
-
 import hudson.Extension;
 import hudson.model.AbstractBuild;
 import hudson.model.TaskListener;
@@ -16,15 +14,6 @@ import hudson.triggers.Trigger;
 @Deprecated
 @Extension
 public class GitLabRunListener extends RunListener<AbstractBuild> {
-
-    @Override
-    public void onCompleted(AbstractBuild abstractBuild, @Nonnull TaskListener listener) {
-        GitLabTrigger trig = getTrigger(abstractBuild);
-        if (trig != null) {
-            trig.onCompleted(abstractBuild);
-        }
-        super.onCompleted(abstractBuild, listener);
-    }
 
     @Override
     public void onStarted(AbstractBuild abstractBuild, TaskListener listener) {
