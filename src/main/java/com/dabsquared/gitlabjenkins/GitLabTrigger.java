@@ -133,21 +133,25 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         final List<String> exclude = DescriptorImpl.splitBranchSpec(this.getExcludeBranchesSpec());
         final List<String> include = DescriptorImpl.splitBranchSpec(this.getIncludeBranchesSpec());
         if (exclude.isEmpty() && include.isEmpty()) {
+            log.debug("No exclude/include filters - branch {} is allowed.", branchName);
             return true;
         }
 
         final AntPathMatcher matcher = new AntPathMatcher();
         for (final String pattern : exclude) {
             if (matcher.match(pattern, branchName)) {
+                log.debug("Branch {} is excluded because it matches exclude filter {}", branchName, pattern);
                 return false;
             }
         }
         for (final String pattern : include) {
             if (matcher.match(pattern, branchName)) {
+                log.debug("Branch {} is included because it matches include filter {}", branchName, pattern);
                 return true;
             }
         }
 
+        log.debug("Branch {} is excluded because it does not match any include filter", branchName);
         return false;
     }
 
@@ -168,6 +172,8 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
     public void run(final GitlabMergeRequestHook event) {
         final GitlabMergeRequestHookAttrs mr = event.getObjectAttributes();
+        log.debug("Merge state: {}, status: {}", mr.getState(), mr.getMergeStatus());
+
         final String branchName = mr.getSourceBranch();
         if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(branchName)) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();

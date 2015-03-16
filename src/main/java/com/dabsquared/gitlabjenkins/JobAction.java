@@ -50,7 +50,7 @@ import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 import com.google.common.io.CharStreams;
 
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 
 import hudson.Util;
 import hudson.model.AbstractProject;
@@ -72,7 +72,7 @@ import jenkins.model.ParameterizedJobMixIn;
  * @author Franta Mejta
  * @sa.date 2015-03-09T13:13:54+0100
  */
-@Log
+@Slf4j
 public class JobAction {
 
     /**
@@ -109,7 +109,13 @@ public class JobAction {
             findTrigger((Job<?, ?>) job);
         }
 
-        return job != null ? new JobAction(job) : null;
+        if (job != null) {
+            log.debug("Found item {} for name {}", job.getFullName(), name);
+            return new JobAction(job);
+        } else {
+            log.debug("Found no item for name {}", name);
+            return null;
+        }
     }
 
     /**
@@ -242,9 +248,16 @@ public class JobAction {
         final String payload = CharStreams.toString(new InputStreamReader(req.getInputStream(), encoding));
         final JsonNode json = GitLabRootAction.JSON.readTree(payload);
 
-        JobAction.validateToken(this.ctx);
+        try {
+            JobAction.validateToken(this.ctx);
+        } catch (final RuntimeException ex) {
+            log.debug("Provided access token is not valid.");
+            throw ex;
+        }
 
         final String objectKind = Objects.firstNonNull(Util.fixEmpty(json.path("object_kind").asText()), GitlabPushHook.OBJECT_KIND);
+        log.debug("Received event of type: {}", objectKind);
+
         if (GitlabPushHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             final GitlabPushHook event = GitLabRootAction.JSON.readValue(json, GitlabPushHook.class);
             if (trigger.isTriggerOpenMergeRequestOnPush()) {
@@ -257,8 +270,8 @@ public class JobAction {
                         }
                     }
                 } else {
-                    log.fine(String.format("Gitlab API access not available; will not build open merge "
-                                           + "request from branch %s if there are any.", event.getRef()));
+                    log.info("Gitlab API access not available; will not build open merge "
+                             + "request from branch {} if there are any.", event.getRef());
                 }
             }
             if (!event.isTagEvent()) {

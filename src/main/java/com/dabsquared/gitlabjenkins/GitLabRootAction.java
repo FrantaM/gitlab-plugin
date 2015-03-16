@@ -38,6 +38,9 @@ import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
 import org.joda.time.format.ISODateTimeFormat;
+import org.kohsuke.stapler.StaplerProxy;
+
+import lombok.extern.slf4j.Slf4j;
 
 import hudson.Extension;
 import hudson.model.UnprotectedRootAction;
@@ -49,8 +52,8 @@ import jenkins.model.Jenkins;
  * @author Franta Mejta
  * @sa.date 2015-03-06T10:26:06+0100
  */
-@Extension
-public class GitLabRootAction implements UnprotectedRootAction {
+@Extension @Slf4j
+public class GitLabRootAction implements UnprotectedRootAction, StaplerProxy {
 
     public static final ObjectMapper JSON = new ObjectMapper()
             .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -96,6 +99,12 @@ public class GitLabRootAction implements UnprotectedRootAction {
     @Override
     public String getUrlName() {
         return GitLabRootAction.URL_NAME;
+    }
+
+    @Override
+    public Object getTarget() {
+        log.debug("Request received.");
+        return this;
     }
 
     public JobAction getJob(final String name) {
