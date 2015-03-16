@@ -23,9 +23,21 @@
  */
 package com.dabsquared.gitlabjenkins;
 
+import java.io.IOException;
+
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.Version;
 import org.codehaus.jackson.map.DeserializationConfig;
+import org.codehaus.jackson.map.DeserializationContext;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.PropertyNamingStrategy;
+import org.codehaus.jackson.map.ext.JodaDeserializers;
+import org.codehaus.jackson.map.module.SimpleModule;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.DateTimeFormatterBuilder;
+import org.joda.time.format.ISODateTimeFormat;
 
 import hudson.Extension;
 import hudson.model.UnprotectedRootAction;
@@ -42,7 +54,33 @@ public class GitLabRootAction implements UnprotectedRootAction {
 
     public static final ObjectMapper JSON = new ObjectMapper()
             .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES);
+            .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES)
+            .withModule(new SimpleModule("GitLabPlugin", new Version(1, 0, 0, null)) {
+
+                {
+                    addDeserializer(DateTime.class, new JodaDeserializers.DateTimeDeserializer<DateTime>(DateTime.class) {
+
+                        private final DateTimeFormatter fmt = new DateTimeFormatterBuilder()
+                                .append(ISODateTimeFormat.date())
+                                .appendLiteral(' ')
+                                .append(ISODateTimeFormat.hourMinuteSecond())
+                                .appendLiteral(' ')
+                                .appendTimeZoneOffset("UTC", true, 2, 4)
+                                .toFormatter();
+
+                        @Override
+                        public DateTime deserialize(final JsonParser jp, final DeserializationContext ctxt) throws IOException, JsonProcessingException {
+                            try {
+                                return super.deserialize(jp, ctxt);
+                            } catch (final IllegalArgumentException ex) {
+                                return fmt.parseDateTime(jp.getText().trim());
+                            }
+                        }
+
+                    });
+                }
+
+            });
     public static final String URL_NAME = "gitlab-ci";
 
     @Override
