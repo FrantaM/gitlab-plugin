@@ -3,6 +3,8 @@ package com.dabsquared.gitlabjenkins;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import javax.annotation.Nonnull;
@@ -235,157 +237,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         }
     }
 
-//    public void onPost(final GitLabPushRequest req) {
-//        if (this.isTriggerOnPush() && this.isBranchAllowed(this.getSourceBranch(req))) {
-//            getDescriptor().queue.execute(new Runnable() {
-//
-//                public void run() {
-//                    LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
-//                    final AbstractProject<?, ?> p = (AbstractProject<?, ?>) job;
-//                    String name = " #" + p.getNextBuildNumber();
-//                    GitLabPushCause cause = null;
-//                    Action[] actions = createActions(req);
-//                    if (p.scheduleBuild(p.getQuietPeriod(), cause, actions)) {
-//                        LOGGER.log(Level.INFO, "GitLab Push Request detected in {0}. Triggering {1}", new String[] { job.getName(), name });
-//                    } else {
-//                        LOGGER.log(Level.INFO, "GitLab Push Request detected in {0}. Job is already in the queue.", job.getName());
-//                    }
-//                }
-//
-//                private Action[] createActions(GitLabPushRequest req) {
-//                    ArrayList<Action> actions = new ArrayList<Action>();
-//
-//                    String branch = getSourceBranch(req);
-//
-//                    LOGGER.log(Level.INFO, "GitLab Push Request from branch {0}.", branch);
-//
-//                    Map<String, ParameterValue> values = new HashMap<String, ParameterValue>();
-//                    values.put("gitlabSourceBranch", new StringParameterValue("gitlabSourceBranch", branch));
-//                    values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", branch));
-//                    values.put("gitlabBranch", new StringParameterValue("gitlabBranch", branch));
-//                    values.put("gitlabSourceRepoName", new StringParameterValue("gitlabSourceRepoName", getSourceRepoNameDefault()));
-//                    values.put("gitlabSourceRepoURL", new StringParameterValue("gitlabSourceRepoURL", getSourceRepoURLDefault().toString()));
-//
-//                    List<ParameterValue> listValues = new ArrayList<ParameterValue>(values.values());
-//
-//                    ParametersAction parametersAction = new ParametersAction(listValues);
-//                    actions.add(parametersAction);
-//
-//                    RevisionParameterAction revision = new RevisionParameterAction(req.getLastCommit().getId());
-//                    actions.add(revision);
-//                    Action[] actionsArray = actions.toArray(new Action[0]);
-//
-//                    return actionsArray;
-//                }
-//
-//            });
-//        }
-//    }
-//
-//    public void onPost(final GitLabMergeRequest req) {
-//        if (this.isTriggerOnMergeRequest()) {
-//            getDescriptor().queue.execute(new Runnable() {
-//
-//                public void run() {
-//                    LOGGER.log(Level.INFO, "{0} triggered.", job.getName());
-//                    final AbstractProject<?, ?> p = (AbstractProject<?, ?>) job;
-//                    String name = " #" + p.getNextBuildNumber();
-//                    GitLabMergeCause cause = null;
-//                    Action[] actions = createActions(req);
-//                    if (p.scheduleBuild(p.getQuietPeriod(), cause, actions)) {
-//                        LOGGER.log(Level.INFO, "GitLab Merge Request detected in {0}. Triggering {1}", new String[] { job.getName(), name });
-//                    } else {
-//                        LOGGER.log(Level.INFO, "GitLab Merge Request detected in {0}. Job is already in the queue.", job.getName());
-//                    }
-//                }
-//
-//                private Action[] createActions(GitLabMergeRequest req) {
-//                    List<Action> actions = new ArrayList<Action>();
-//
-//                    Map<String, ParameterValue> values = new HashMap<String, ParameterValue>();
-//                    values.put("gitlabSourceBranch", new StringParameterValue("gitlabSourceBranch", getSourceBranch(req)));
-//                    values.put("gitlabTargetBranch", new StringParameterValue("gitlabTargetBranch", req.getObjectAttribute().getTargetBranch()));
-//
-//                    String sourceRepoName = getSourceRepoNameDefault();
-//                    String sourceRepoURL = getSourceRepoURLDefault().toString();
-//
-//                    if (!getDescriptor().getGitlabHostUrl().isEmpty()) {
-//                        // Get source repository if communication to Gitlab is possible
-//                        try {
-//                            sourceRepoName = req.getSourceProject(getDesc().getGitlab()).getPathWithNamespace();
-//                            sourceRepoURL = req.getSourceProject(getDesc().getGitlab()).getSshUrl();
-//                        } catch (IOException ex) {
-//                            LOGGER.log(Level.WARNING, "Could not fetch source project''s data from Gitlab. '('{0}':' {1}')'", new String[] { ex.toString(), ex.getMessage() });
-//                        }
-//                    }
-//
-//                    values.put("gitlabSourceRepoName", new StringParameterValue("gitlabSourceRepoName", sourceRepoName));
-//                    values.put("gitlabSourceRepoURL", new StringParameterValue("gitlabSourceRepoURL", sourceRepoURL));
-//
-//                    List<ParameterValue> listValues = new ArrayList<ParameterValue>(values.values());
-//
-//                    ParametersAction parametersAction = new ParametersAction(listValues);
-//                    actions.add(parametersAction);
-//
-//                    Action[] actionsArray = actions.toArray(new Action[0]);
-//
-//                    return actionsArray;
-//                }
-//
-//            });
-//        }
-//    }
-    /**
-     * Get the URL of the first declared repository in the project configuration.
-     * Use this as default source repository url.
-     *
-     * @return URIish the default value of the source repository url
-     * @throws IllegalStateException Project does not use git scm.
-     */
-    @Nullable
-    protected static URIish getSourceRepoURLDefault(final Job<?, ?> job) throws IllegalStateException {
-        SCM scm = ((AbstractProject<?, ?>) job).getScm();
-        if (!(scm instanceof GitSCM)) {
-            throw new IllegalStateException("This repo does not use git.");
-        }
-
-        List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
-        if (!repositories.isEmpty()) {
-            RemoteConfig defaultRepository = repositories.get(repositories.size() - 1);
-            List<URIish> uris = defaultRepository.getURIs();
-            if (!uris.isEmpty()) {
-                return uris.get(uris.size() - 1);
-            }
-        }
-
-        return null;
-    }
-
-    protected URIish getSourceRepoURLDefault() throws IllegalStateException {
-        return getSourceRepoURLDefault((Job<?, ?>) this.job);
-    }
-
-    /**
-     * Get the Name of the first declared repository in the project configuration.
-     * Use this as default source repository Name.
-     *
-     * @return String with the default name of the source repository
-     */
-    protected String getSourceRepoNameDefault() {
-        String result = null;
-        SCM scm = ((AbstractProject<?, ?>) job).getScm();
-        if (!(scm instanceof GitSCM)) {
-            throw new IllegalArgumentException("This repo does not use git.");
-        }
-        if (scm instanceof GitSCM) {
-            List<RemoteConfig> repositories = ((GitSCM) scm).getRepositories();
-            if (!repositories.isEmpty()) {
-                return repositories.get(repositories.size() - 1).getName();
-            }
-        }
-        return null;
-    }
-
     @Override
     public DescriptorImpl getDescriptor() {
         return (DescriptorImpl) super.getDescriptor();
@@ -518,8 +369,47 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             return super.configure(req, formData);
         }
 
+        /**
+         * Get the URL of the first declared repository in the project configuration.
+         *
+         * @return Default value of the source repository url
+         * @throws IllegalStateException Project does not use git scm.
+         */
+        @Nullable
+        private String getProjectRepositoryUrl(final Job<?, ?> job) throws IllegalStateException {
+            Collection<? extends SCM> scmlist = null;
+            final SCMTriggerItem sci = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(job);
+            if (sci != null) {
+                scmlist = sci.getSCMs();
+            }
+            if (scmlist == null && job instanceof AbstractProject<?, ?>) {
+                scmlist = Collections.singleton(((AbstractProject<?, ?>) job).getScm());
+            }
+            if (scmlist == null) {
+                throw new IllegalStateException("Cannot determine scm.");
+            }
+
+            final List<GitSCM> scm = Util.filter(scmlist, GitSCM.class);
+            if (scm.isEmpty()) {
+                throw new IllegalStateException("This repo does not use git.");
+            }
+
+            for (final GitSCM git : scm) {
+                final List<RemoteConfig> repositories = git.getRepositories();
+                if (!repositories.isEmpty()) {
+                    final RemoteConfig defaultRepository = repositories.get(repositories.size() - 1);
+                    final List<URIish> uris = defaultRepository.getURIs();
+                    if (!uris.isEmpty()) {
+                        return uris.get(uris.size() - 1).toASCIIString();
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private List<String> getProjectBranches(@Nonnull final Job<?, ?> job) throws IOException, IllegalStateException {
-            final URIish sourceRepository = getSourceRepoURLDefault(job);
+            final String sourceRepository = this.getProjectRepositoryUrl(job);
             if (sourceRepository == null) {
                 throw new IllegalStateException(Messages.GitLabPushTrigger_NoSourceRepository());
             }
@@ -528,14 +418,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 final List<String> branchNames = new ArrayList<String>();
                 final GitlabAPI api = newGitlabConnection();
                 if (api != null) {
-                    /* TODO until java-gitlab-api v1.1.5 is released,
-                     * cannot search projects by namespace/name
-                     * For now getting project id before getting project branches */
                     final List<GitlabProject> projects = api.getProjects();
                     for (final GitlabProject gitlabProject : projects) {
-                        if (gitlabProject.getSshUrl().equalsIgnoreCase(sourceRepository.toString())
-                            || gitlabProject.getHttpUrl().equalsIgnoreCase(sourceRepository.toString())) {
-                            //Get all branches of project
+                        if (gitlabProject.getSshUrl().equalsIgnoreCase(sourceRepository)
+                            || gitlabProject.getHttpUrl().equalsIgnoreCase(sourceRepository)) {
                             final List<GitlabBranch> branches = api.getBranches(gitlabProject);
                             for (final GitlabBranch branch : branches) {
                                 branchNames.add(branch.getName());
