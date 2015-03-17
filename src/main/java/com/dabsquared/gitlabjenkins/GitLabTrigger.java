@@ -515,6 +515,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             return this.doCheckBranchesSpec(project, value);
         }
 
+        public String getDefaultValueToken() {
+            return Util.getDigestOf(String.valueOf(System.nanoTime()));
+        }
+
         public FormValidation doCheckToken(@QueryParameter final String value) {
             return FormValidation.validateRequired(value);
         }
