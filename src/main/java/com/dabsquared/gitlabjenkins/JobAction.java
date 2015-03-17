@@ -263,11 +263,16 @@ public class JobAction {
             if (trigger.isTriggerOpenMergeRequestOnPush()) {
                 final GitlabAPI api = trigger.getDescriptor().newGitlabConnection();
                 if (api != null) {
-                    final GitlabProject gp = api.getProject(event.getProjectId());
-                    for (final GitlabMergeRequest mr : api.getOpenMergeRequests(gp)) {
-                        if (event.getRef().endsWith(mr.getSourceBranch())) {
-                            trigger.run(mr);
+                    try {
+                        final GitlabProject gp = api.getProject(event.getProjectId());
+                        for (final GitlabMergeRequest mr : api.getOpenMergeRequests(gp)) {
+                            if (event.getRef().endsWith(mr.getSourceBranch())) {
+                                trigger.run(mr);
+                            }
                         }
+                    } catch (final IOException ex) {
+                        log.warn("Error while retrieving open merge requests from gitlab. "
+                                 + "Not all (if any) may have been scheduled to build.", ex);
                     }
                 } else {
                     log.info("Gitlab API access not available; will not build open merge "
