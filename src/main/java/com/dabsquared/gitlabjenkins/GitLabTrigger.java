@@ -51,7 +51,6 @@ import lombok.extern.slf4j.Slf4j;
 import hudson.Extension;
 import hudson.Util;
 import hudson.XmlFile;
-import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.AutoCompletionCandidates;
@@ -98,7 +97,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
      */
     @Getter @Setter @DataBoundSetter
     private boolean triggerOpenMergeRequestOnPush = true;
-    private boolean setBuildDescription = true;
     /**
      * Branches that will trigger a build on push.
      */
@@ -116,12 +114,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     private String token;
 
     @DataBoundConstructor
-    public GitLabTrigger(boolean setBuildDescription) {
-        this.setBuildDescription = setBuildDescription;
-    }
-
-    public boolean getSetBuildDescription() {
-        return setBuildDescription;
+    public GitLabTrigger() {
     }
 
     private boolean isBranchAllowed(final String branchName) {
@@ -389,32 +382,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             }
         }
         return null;
-    }
-
-    private void setBuildCauseInJob(AbstractBuild abstractBuild) {
-        if (setBuildDescription) {
-            Cause pcause = abstractBuild.getCause(GitLabPushCause.class);
-            Cause mcause = abstractBuild.getCause(GitLabMergeCause.class);
-            String desc = null;
-            if (pcause != null) {
-                desc = pcause.getShortDescription();
-            }
-            if (mcause != null) {
-                desc = mcause.getShortDescription();
-            }
-            if (desc != null && desc.length() > 0) {
-                try {
-                    abstractBuild.setDescription(desc);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    @Deprecated
-    public void onStarted(AbstractBuild abstractBuild) {
-        setBuildCauseInJob(abstractBuild);
     }
 
     @Override
