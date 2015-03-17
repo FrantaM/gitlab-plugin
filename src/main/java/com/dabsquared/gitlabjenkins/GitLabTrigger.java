@@ -120,7 +120,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     }
 
     private boolean isBranchAllowed(String branchName) {
-        branchName = StringUtils.removeStart("refs/heads/", branchName);
+        branchName = StringUtils.removeStart(branchName, "refs/heads/");
 
         final List<String> exclude = DescriptorImpl.splitBranchSpec(this.getExcludeBranchesSpec());
         final List<String> include = DescriptorImpl.splitBranchSpec(this.getIncludeBranchesSpec());
