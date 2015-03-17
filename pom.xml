@@ -89,7 +89,7 @@
         <dependency>
             <groupId>org.gitlab</groupId>
             <artifactId>java-gitlab-api</artifactId>
-            <version>1.1.7</version>
+            <version>1.1.8-20150317.140706-1</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
