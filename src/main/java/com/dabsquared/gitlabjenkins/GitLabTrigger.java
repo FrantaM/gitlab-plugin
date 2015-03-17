@@ -119,7 +119,9 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     public GitLabTrigger() {
     }
 
-    private boolean isBranchAllowed(final String branchName) {
+    private boolean isBranchAllowed(String branchName) {
+        branchName = StringUtils.removeStart("refs/heads/", branchName);
+
         final List<String> exclude = DescriptorImpl.splitBranchSpec(this.getExcludeBranchesSpec());
         final List<String> include = DescriptorImpl.splitBranchSpec(this.getIncludeBranchesSpec());
         if (exclude.isEmpty() && include.isEmpty()) {
@@ -146,14 +148,13 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     }
 
     public void run(final GitlabPushHook event) {
-        final String branchName = StringUtils.removeStart(event.getRef(), "refs/heads/");
-        if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
+        if (this.isTriggerOnPush() && this.isBranchAllowed(event.getRef())) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
-            parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabSourceBranch", event.getRef()));
+            parameters.add(new StringParameterValue("gitlabTargetBranch", event.getRef()));
 
-            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
-            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(event.getRef()));
+            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(event.getRef()));
             parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(event.getRepository().getGitSshUrl()));
             parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(event.getRepository().getGitHttpUrl()));
 
@@ -166,8 +167,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         final GitlabMergeRequestHookAttrs mr = event.getObjectAttributes();
         log.debug("Merge state: {}, status: {}", mr.getState(), mr.getMergeStatus());
 
-        final String branchName = mr.getSourceBranch();
-        if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(branchName)) {
+        if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(mr.getSourceBranch()) && this.isBranchAllowed(mr.getTargetBranch())) {
             if (mr.getState() != State.OPENED && mr.getState() != State.REOPENED) {
                 log.info("Skipping merge request #{} because it's not open.", mr.getIid());
                 return;
@@ -178,10 +178,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             }
 
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
-            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(mr.getSourceBranch()));
             parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(mr.getTargetBranch()));
             parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(mr.getSource().getSshUrl()));
             parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(mr.getSource().getHttpUrl()));
@@ -192,13 +192,12 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     }
 
     public void run(final GitlabMergeRequest mr) {
-        final String branchName = mr.getSourceBranch();
-        if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(branchName)) {
+        if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(mr.getSourceBranch()) && this.isBranchAllowed(mr.getTargetBranch())) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
-            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(mr.getSourceBranch()));
             parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(mr.getTargetBranch()));
 
             final GitlabAPI api = this.getDescriptor().newGitlabConnection();
