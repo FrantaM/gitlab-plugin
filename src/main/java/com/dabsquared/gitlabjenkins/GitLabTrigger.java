@@ -30,6 +30,7 @@ import com.dabsquared.gitlabjenkins.models.attrs.GitlabMergeRequestHookAttrs.Sta
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
@@ -119,9 +120,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     public GitLabTrigger() {
     }
 
-    private boolean isBranchAllowed(String branchName) {
-        branchName = StringUtils.removeStart(branchName, "refs/heads/");
-
+    private boolean isBranchAllowed(final String branchName) {
         final List<String> exclude = DescriptorImpl.splitBranchSpec(this.getExcludeBranchesSpec());
         final List<String> include = DescriptorImpl.splitBranchSpec(this.getIncludeBranchesSpec());
         if (exclude.isEmpty() && include.isEmpty()) {
@@ -153,15 +152,18 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     }
 
     public void run(final GitlabPushHook event) {
-        if (this.isTriggerOnPush() && this.isBranchAllowed(event.getRef())) {
+        final String branchName = StringUtils.removeStart(event.getRef(), "refs/heads/");
+        if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", event.getRef()));
-            parameters.add(new StringParameterValue("gitlabTargetBranch", event.getRef()));
+            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
+            parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
 
-            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(event.getRef()));
-            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(event.getRef()));
-            parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(event.getRepository().getGitSshUrl()));
-            parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(event.getRepository().getGitHttpUrl()));
+            parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(branchName));
+
+            final GitlabPushHook.Repository repo = event.getRepository();
+            parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(Objects.firstNonNull(repo.getGitSshUrl(), repo.getUrl())));
+            parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(repo.getGitHttpUrl()));
 
             final GitLabPushCause cause = new GitLabPushCause(event);
             this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));

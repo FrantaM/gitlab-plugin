@@ -71,8 +71,17 @@ public class GitlabPushHook {
         private String url;
         private String description;
         private String homepage;
+        /**
+         * @since 7.8.0
+         */
         private String gitHttpUrl;
+        /**
+         * @since 7.8.0
+         */
         private String gitSshUrl;
+        /**
+         * @since 7.8.0
+         */
         private int visibilityLevel;
     }
 

@@ -23,6 +23,7 @@
  */
 package com.dabsquared.gitlabjenkins;
 
+import hudson.Util;
 import hudson.model.StringParameterValue;
 
 /**
@@ -39,7 +40,7 @@ public enum BuildParameters {
     GITLAB_SOURCE_HTTP;
 
     StringParameterValue withValueOf(final String value) {
-        return new StringParameterValue(this.name(), value);
+        return new StringParameterValue(this.name(), Util.fixNull(value));
     }
 
 }
