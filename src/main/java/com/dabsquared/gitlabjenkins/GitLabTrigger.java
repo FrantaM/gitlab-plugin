@@ -136,15 +136,20 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 return false;
             }
         }
-        for (final String pattern : include) {
-            if (matcher.match(pattern, branchName)) {
-                log.debug("Branch {} is included because it matches include filter {}", branchName, pattern);
-                return true;
+        if (!include.isEmpty()) {
+            for (final String pattern : include) {
+                if (matcher.match(pattern, branchName)) {
+                    log.debug("Branch {} is included because it matches include filter {}", branchName, pattern);
+                    return true;
+                }
             }
-        }
 
-        log.debug("Branch {} is excluded because it does not match any include filter", branchName);
-        return false;
+            log.debug("Branch {} is excluded because it does not match any include filter", branchName);
+            return false;
+        } else {
+            log.debug("Branch {} is included because it does not match any exclude filter.", branchName);
+            return true;
+        }
     }
 
     public void run(final GitlabPushHook event) {
