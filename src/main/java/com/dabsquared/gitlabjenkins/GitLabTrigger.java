@@ -152,6 +152,8 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
             parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
             parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(branchName));
+            parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(event.getRepository().getGitSshUrl()));
+            parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(event.getRepository().getGitHttpUrl()));
 
             final GitLabPushCause cause = new GitLabPushCause(event);
             this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
