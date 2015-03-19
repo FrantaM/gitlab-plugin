@@ -12,8 +12,8 @@
         <f:entry title="Build on Push Events" field="triggerOnPush">
             <f:checkbox default="true" />
         </f:entry>
-        <f:entry title="Rebuild open Merge Requests on Push Events" field="triggerOpenMergeRequestOnPush">
-            <f:checkbox default="true" />
+        <f:entry title="${%Push to branch with open merge request}" field="triggerOpenMergeRequestOnPush">
+            <f:enum>${it.toString()}</f:enum>
         </f:entry>
         <f:entry title="${%Include branches}">
             <f:textbox field="includeBranchesSpec" autocompleteDelimChar="," />

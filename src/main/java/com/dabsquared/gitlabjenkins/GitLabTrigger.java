@@ -40,6 +40,7 @@ import com.thoughtworks.xstream.converters.Converter;
 import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.UnmarshallingContext;
 import com.thoughtworks.xstream.converters.collections.CollectionConverter;
+import com.thoughtworks.xstream.converters.enums.EnumConverter;
 import com.thoughtworks.xstream.converters.reflection.AbstractReflectionConverter;
 import com.thoughtworks.xstream.io.HierarchicalStreamReader;
 import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
@@ -88,18 +89,18 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
      * Flag whether a push will trigger a build.
      */
     @Getter @Setter @DataBoundSetter
-    private boolean triggerOnPush = true;
+    private boolean triggerOnPush;
     /**
      * Flag whether a merge request will trigger a build.
      */
     @Getter @Setter @DataBoundSetter
-    private boolean triggerOnMergeRequest = true;
+    private boolean triggerOnMergeRequest;
     /**
      * Flag whether a push to a branch with open merge request
      * will trigger a build of that merge request.
      */
-    @Getter @Setter @DataBoundSetter
-    private boolean triggerOpenMergeRequestOnPush = true;
+    @Getter @Setter @DataBoundSetter @Nonnull
+    private PushToOpenMRPolicy triggerOpenMergeRequestOnPush;
     /**
      * Branches that will trigger a build on push.
      */
@@ -118,6 +119,9 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
     @DataBoundConstructor
     public GitLabTrigger() {
+        this.triggerOnPush = true;
+        this.triggerOnMergeRequest = true;
+        this.triggerOpenMergeRequestOnPush = PushToOpenMRPolicy.BUILD_MR;
     }
 
     private boolean isBranchAllowed(final String branchName) {
@@ -275,6 +279,25 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 @Override @SuppressWarnings("rawtypes")
                 public boolean canConvert(final Class type) {
                     return List.class.isAssignableFrom(type) || String.class.isAssignableFrom(type);
+                }
+
+            });
+            xstream.registerLocalConverter(GitLabTrigger.class, "triggerOpenMergeRequestOnPush", new EnumConverter() {
+
+                @Override
+                public Object unmarshal(final HierarchicalStreamReader reader, final UnmarshallingContext context) {
+                    final String value = reader.getValue();
+                    if ("true".equalsIgnoreCase(value)) {
+                        return PushToOpenMRPolicy.BUILD_BRANCH_AND_MR;
+                    }
+                    if ("false".equalsIgnoreCase(value)) {
+                        return PushToOpenMRPolicy.BUILD_BRANCH;
+                    }
+                    if (Util.fixEmptyAndTrim(value) == null) {
+                        return PushToOpenMRPolicy.BUILD_MR;
+                    }
+
+                    return super.unmarshal(reader, context);
                 }
 
             });

@@ -260,27 +260,41 @@ public class JobAction {
 
         if (GitlabPushHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             final GitlabPushHook event = GitLabRootAction.JSON.readValue(json, GitlabPushHook.class);
-            if (trigger.isTriggerOpenMergeRequestOnPush()) {
-                final GitlabAPI api = trigger.getDescriptor().newGitlabConnection();
-                if (api != null) {
-                    try {
-                        final GitlabProject gp = api.getProject(event.getProjectId());
-                        for (final GitlabMergeRequest mr : api.getOpenMergeRequests(gp)) {
-                            if (event.getRef().endsWith(mr.getSourceBranch())) {
-                                trigger.run(mr);
+            final PushToOpenMRPolicy openMRPolicy = trigger.getTriggerOpenMergeRequestOnPush();
+            switch (openMRPolicy) {
+                case BUILD_BRANCH_AND_MR:
+                case BUILD_MR:
+                    boolean buildBranch = true;
+                    final GitlabAPI api = trigger.getDescriptor().newGitlabConnection();
+                    if (api != null) {
+                        try {
+                            final GitlabProject gp = api.getProject(event.getProjectId());
+                            for (final GitlabMergeRequest mr : api.getOpenMergeRequests(gp)) {
+                                if (event.getRef().endsWith(mr.getSourceBranch())) {
+                                    trigger.run(mr);
+
+                                    if (openMRPolicy == PushToOpenMRPolicy.BUILD_MR) {
+                                        buildBranch = false;
+                                    }
+                                }
                             }
+                        } catch (final IOException ex) {
+                            log.warn("Error while retrieving open merge requests from gitlab. "
+                                     + "Not all (if any) may have been scheduled to build.", ex);
                         }
-                    } catch (final IOException ex) {
-                        log.warn("Error while retrieving open merge requests from gitlab. "
-                                 + "Not all (if any) may have been scheduled to build.", ex);
+                    } else {
+                        log.info("Gitlab API access not available; will not build open merge "
+                                 + "request from branch {} if there are any.", event.getRef());
                     }
-                } else {
-                    log.info("Gitlab API access not available; will not build open merge "
-                             + "request from branch {} if there are any.", event.getRef());
-                }
-            }
-            if (!event.isTagEvent()) {
-                trigger.run(event);
+                    if (!buildBranch) {
+                        log.debug("Skipping build of branch {} because some merge requests "
+                                  + "are being build instead.", event.getRef());
+                        break;
+                    }
+                case BUILD_BRANCH:
+                    if (!event.isTagEvent()) {
+                        trigger.run(event);
+                    }
             }
         } else if (GitlabMergeRequestHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             trigger.run(GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class));
