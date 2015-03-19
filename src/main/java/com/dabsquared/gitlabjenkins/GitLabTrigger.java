@@ -228,19 +228,14 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     }
 
     private void schedule(final Cause cause, final Action... actions) {
-        if (job instanceof SCMTriggerItem) {
-            final SCMTriggerItem i = (SCMTriggerItem) job;
-            final Action[] realActions = new Action[actions.length + 1];
-            realActions[0] = new CauseAction(cause);
-            System.arraycopy(actions, 0, realActions, 1, actions.length);
-            i.scheduleBuild2(i.getQuietPeriod(), realActions);
-        } else if (job instanceof AbstractProject<?, ?>) {
-            final AbstractProject<?, ?> i = (AbstractProject<?, ?>) job;
-            i.scheduleBuild2(i.getQuietPeriod(), cause, actions);
-        } else {
-            log.warn("Cannot pass actions to job {}.", job);
-            job.scheduleBuild(cause);
-        }
+        final SCMTriggerItem sci = SCMTriggerItem.SCMTriggerItems.asSCMTriggerItem(this.job);
+        assert sci != null : "enforced by descriptor";
+
+        final Action[] realActions = new Action[actions.length + 1];
+        realActions[0] = new CauseAction(cause);
+        System.arraycopy(actions, 0, realActions, 1, actions.length);
+
+        sci.scheduleBuild2(sci.getQuietPeriod(), realActions);
     }
 
     @Override
