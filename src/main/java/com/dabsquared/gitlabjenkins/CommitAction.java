@@ -49,10 +49,12 @@ import hudson.model.Job;
 import hudson.model.Run;
 import hudson.plugins.git.Revision;
 import hudson.plugins.git.util.BuildData;
+import hudson.security.ACL;
 import hudson.tasks.Fingerprinter.FingerprintAction;
 import hudson.util.HttpResponses;
 
 import jenkins.model.Jenkins;
+import jenkins.security.NotReallyRoleSensitiveCallable;
 
 /**
  * Gitlab actions/info related to a commit.
@@ -140,7 +142,17 @@ public class CommitAction {
         for (final FingerprintAction fa : run.getActions(FingerprintAction.class)) {
             for (final Fingerprint fp : fa.getFingerprints().values()) {
                 for (final Map.Entry<String, RangeSet> e : fp.getUsages().entrySet()) {
-                    final Job<?, ?> fpjob = Jenkins.getActiveInstance().getItemByFullName(e.getKey(), Job.class);
+                    final Job<?, ?> fpjob = ACL.impersonate(ACL.SYSTEM, new NotReallyRoleSensitiveCallable<Job<?, ?>, RuntimeException>() {
+
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        public Job<?, ?> call() {
+                            return Jenkins.getActiveInstance().getItemByFullName(e.getKey(), Job.class);
+                        }
+
+                    });
+
                     if (fpjob != null) {
                         for (final int build : e.getValue().listNumbers()) {
                             final Run<?, ?> fprun = fpjob.getBuildByNumber(build);
