@@ -3,10 +3,6 @@ gitlab-plugin
 
 This plugin emulates Jenkins as a GitlabCI Web Service to be used with GitlabHQ.
 
-[![Build Status](https://travis-ci.org/DABSquared/gitlab-plugin.svg?branch=master)](https://travis-ci.org/DABSquared/gitlab-plugin) 
-[![Gitter chat](https://badges.gitter.im/DABSquared/gitlab-plugin.png)](https://gitter.im/DABSquared/gitlab-plugin)
-
-
 Current Supported GitLabCI Functions
 =====================
 * `/project/PROJECT_NAME/builds/COMMIT_SHA1/status.json` (used for Merge Request pages) returns build result for Merge Request build with `COMMIT_SHA1` as last commit
