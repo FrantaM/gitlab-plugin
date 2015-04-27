@@ -6,10 +6,10 @@
         <version>1.596.1</version>
     </parent>
 
-    <artifactId>gitlab-plugin</artifactId>
+    <artifactId>gitlab-plugin-sa</artifactId>
     <version>1.1.15-SNAPSHOT</version>
     <name>GitLab Plugin</name>
-    <url>https://wiki.jenkins-ci.org/display/JENKINS/GitLab+Plugin</url>
+    <url>https://gitlab.sa.cz/jenkins/gitlab-plugin/wikis/home</url>
     <packaging>hpi</packaging>
 
     <licenses>
@@ -28,13 +28,16 @@
     </developers>
 
     <scm>
-        <connection>scm:git:ssh://github.com:jenkinsci/gitlab-plugin.git</connection>
-        <developerConnection>scm:git:git@github.com:jenkinsci/gitlab-plugin.git</developerConnection>
-        <url>https://github.com/jenkinsci/gitlab-plugin</url>
+        <connection>scm:git:ssh://git@gitlab.sa.cz:jenkins/gitlab-plugin.git</connection>
+        <url>https://gitlab.sa.cz/jenkins/gitlab-plugin</url>
         <tag>HEAD</tag>
     </scm>
 
     <repositories>
+        <repository>
+            <id>mvn.sa.cz</id>
+            <url>https://mvn.sa.cz/repo</url>
+        </repository>
         <repository>
             <id>repo.jenkins-ci.org</id>
             <url>http://repo.jenkins-ci.org/public/</url>
