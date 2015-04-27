@@ -238,6 +238,10 @@ public class JobAction {
         return new CommitAction(asJob(), run);
     }
 
+    public HttpResponse doIndex() {
+        return HttpResponses.redirectViaContextPath(asJob().getUrl());
+    }
+
     public HttpResponse doStatus(@QueryParameter final String ref) {
         return StatusImage.forRun(findRunByRef(ref)).respond();
     }
