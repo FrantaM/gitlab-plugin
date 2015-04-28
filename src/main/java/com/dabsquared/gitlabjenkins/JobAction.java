@@ -46,6 +46,7 @@ import org.kohsuke.stapler.StaplerResponse;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 import com.google.common.io.CharStreams;
@@ -59,6 +60,7 @@ import hudson.model.ItemGroup;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.plugins.git.GitSCM;
+import hudson.plugins.git.Revision;
 import hudson.plugins.git.util.Build;
 import hudson.plugins.git.util.BuildData;
 import hudson.security.ACL;
@@ -163,7 +165,7 @@ public class JobAction {
         throw new IllegalArgumentException();
     }
 
-    private Job<?, ?> asJob() {
+    protected Job<?, ?> asJob() {
         if (this.ctx instanceof Job<?, ?>) {
             return (Job<?, ?>) this.ctx;
         }
@@ -171,55 +173,66 @@ public class JobAction {
     }
 
     @Nullable
-    private Run<?, ?> findRunByRef(@Nullable final String ref) {
+    private Run<?, ?> findRunByRef(@Nonnull final String ref) {
         return this.findRun(ref, null);
     }
 
     @Nullable
-    private Run<?, ?> findRunByHash(@Nullable final String hash) {
+    private Run<?, ?> findRunByHash(@Nonnull final String hash) {
         return this.findRun(null, hash);
     }
 
     @Nullable
-    private Run<?, ?> findRun(@Nullable final String ref, @Nullable final String hash) {
-        String refrepository = "";
+    protected Run<?, ?> findRun(@Nullable final String ref, @Nullable final String hash) {
+        if (ref == null && hash == null) {
+            throw new IllegalArgumentException("ref or hash must not be null");
+        }
+
+        String refrepository0 = "";
         if (ref != null) {
             if (asJob() instanceof AbstractProject<?, ?>) {
                 final AbstractProject<?, ?> p = (AbstractProject<?, ?>) asJob();
                 if (p.getScm() instanceof GitSCM) {
                     final GitSCM scm = (GitSCM) p.getScm();
                     for (final RemoteConfig rc : scm.getRepositories()) {
-                        refrepository = rc.getName() + "/";
+                        refrepository0 = rc.getName() + "/";
                         break;
                     }
                 }
             }
         }
 
-        for (final Run<?, ?> run : asJob().getBuilds()) {
-            int refBuildNumber = 0;
-            for (final BuildData buildData : run.getActions(BuildData.class)) {
-                if (ref != null) {
-                    final Build buildA = buildData.getLastBuildOfBranch(refrepository + ref);
-                    if (buildA != null) {
-                        refBuildNumber = Math.max(refBuildNumber, buildA.getBuildNumber());
-                    }
+        final String refrepository = refrepository0;
+        final Function<Build, Boolean> valid = new Function<Build, Boolean>() {
 
-                    final Build buildB = buildData.getLastBuildOfBranch("refs/remotes/" + refrepository + ref);
-                    if (buildB != null) {
-                        refBuildNumber = Math.max(refBuildNumber, buildB.getBuildNumber());
+            @Override
+            public Boolean apply(@Nonnull final Build input) {
+                return apply(input.getRevision()) || apply(input.getMarked());
+            }
+
+            public Boolean apply(@Nonnull final Revision rev) {
+                if (ref != null) {
+                    if (!rev.containsBranchName(refrepository + ref)
+                        && !rev.containsBranchName("refs/remotes/" + refrepository + ref)) {
+                        return false;
                     }
                 }
                 if (hash != null) {
-                    final Build last = buildData.lastBuild;
-                    if (last != null) {
-                        if (last.getRevision().getSha1String().startsWith(hash) || last.getMarked().getSha1String().startsWith(hash)) {
-                            refBuildNumber = last.getBuildNumber();
-                        }
+                    if (!rev.getSha1String().equalsIgnoreCase(hash)) {
+                        return false;
                     }
                 }
-                if (refBuildNumber > 0) {
-                    return asJob().getBuildByNumber(refBuildNumber);
+                return true;
+            }
+
+        };
+
+        for (final Run<?, ?> run : asJob().getBuilds()) {
+            for (final BuildData buildData : run.getActions(BuildData.class)) {
+                for (final Build build : buildData.getBuildsByBranchName().values()) {
+                    if (valid.apply(build)) {
+                        return asJob().getBuildByNumber(build.getBuildNumber());
+                    }
                 }
             }
         }
@@ -236,6 +249,11 @@ public class JobAction {
     public CommitAction getCommits(final String hash) {
         final Run<?, ?> run = this.findRunByHash(hash);
         return new CommitAction(asJob(), run);
+    }
+
+    @Nonnull
+    public JobAction getRefs(final String ref) {
+        return new RefsAdapter(ctx, ref);
     }
 
     public HttpResponse doIndex() {
@@ -313,6 +331,32 @@ public class JobAction {
         if (req.getRestOfPath().startsWith("/status")) {
             rsp.forward(this, "status", req);
         }
+    }
+
+    public static class RefsAdapter extends JobAction {
+
+        private final String ref;
+
+        public RefsAdapter(final Item ctx, final String ref) {
+            super(ctx);
+            this.ref = ref;
+        }
+
+        @Override
+        public JobAction getJob(final String name) {
+            throw HttpResponses.notFound();
+        }
+
+        @Override
+        public JobAction getRefs(final String ref) {
+            throw HttpResponses.notFound();
+        }
+
+        @Override
+        public CommitAction getCommits(final String hash) {
+            return new CommitAction(asJob(), findRun(ref, hash));
+        }
+
     }
 
 }
