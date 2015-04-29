@@ -282,6 +282,11 @@ public class JobAction {
 
         if (GitlabPushHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             final GitlabPushHook event = GitLabRootAction.JSON.readValue(json, GitlabPushHook.class);
+            if (event.isBranchRemoveEvent()) {
+                log.debug("Removed branch {}. Build skipped.", event.getRef());
+                return HttpResponses.ok();
+            }
+
             final PushToOpenMRPolicy openMRPolicy = trigger.getTriggerOpenMergeRequestOnPush();
             switch (openMRPolicy) {
                 case BUILD_BRANCH_AND_MR:

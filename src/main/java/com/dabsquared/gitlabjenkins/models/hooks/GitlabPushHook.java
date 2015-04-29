@@ -23,6 +23,8 @@
  */
 package com.dabsquared.gitlabjenkins.models.hooks;
 
+import org.eclipse.jgit.lib.ObjectId;
+
 import com.dabsquared.gitlabjenkins.models.attrs.GitlabCommitHookAttrs;
 
 import lombok.Data;
@@ -62,6 +64,11 @@ public class GitlabPushHook {
 
     public final boolean isTagEvent() {
         return this.getRef().startsWith("refs/tags/");
+    }
+
+    public final boolean isBranchRemoveEvent() {
+        return this.getRef().startsWith("refs/heads/")
+               && this.getAfter().equals(ObjectId.zeroId().name());
     }
 
     @Data
