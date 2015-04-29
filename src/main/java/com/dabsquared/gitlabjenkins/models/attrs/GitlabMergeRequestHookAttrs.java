@@ -60,6 +60,10 @@ public class GitlabMergeRequestHookAttrs {
     private Integer targetProjectId;
     private Integer iid;
     private String description;
+    /**
+     * @since 7.8.0
+     */
+    private Action action;
 
     public enum State {
 
@@ -79,6 +83,17 @@ public class GitlabMergeRequestHookAttrs {
         @JsonCreator
         public static MergeStatus fromJson(final String value) {
             return MergeStatus.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+
+    }
+
+    public enum Action {
+
+        OPEN, CLOSE, MERGE, REOPEN, UPDATE;
+
+        @JsonCreator
+        public static Action fromJson(final String value) {
+            return Action.valueOf(value.toUpperCase(Locale.ROOT));
         }
 
     }

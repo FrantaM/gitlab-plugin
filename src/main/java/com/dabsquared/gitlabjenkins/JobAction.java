@@ -43,6 +43,7 @@ import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
+import com.dabsquared.gitlabjenkins.models.attrs.GitlabMergeRequestHookAttrs;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabMergeRequestHook;
 import com.dabsquared.gitlabjenkins.models.hooks.GitlabPushHook;
 import com.google.common.base.Charsets;
@@ -324,7 +325,10 @@ public class JobAction {
                     }
             }
         } else if (GitlabMergeRequestHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
-            trigger.run(GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class));
+            final GitlabMergeRequestHook event = GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class);
+            if (event.getObjectAttributes().getAction() == GitlabMergeRequestHookAttrs.Action.OPEN) {
+                trigger.run(event);
+            }
         } else {
             throw HttpResponses.status(HttpServletResponse.SC_BAD_REQUEST);
         }
