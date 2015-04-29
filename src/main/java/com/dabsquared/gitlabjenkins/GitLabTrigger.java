@@ -63,8 +63,10 @@ import hudson.model.Cause;
 import hudson.model.CauseAction;
 import hudson.model.Item;
 import hudson.model.Job;
+import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
+import hudson.model.ParametersDefinitionProperty;
 import hudson.model.StringParameterValue;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.RevisionParameterAction;
@@ -158,7 +160,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     public void run(final GitlabPushHook event) {
         final String branchName = StringUtils.removeStart(event.getRef(), "refs/heads/");
         if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
-            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
+            final List<ParameterValue> parameters = this.getDefaultParameters();
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
 
@@ -188,7 +190,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 return;
             }
 
-            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
+            final List<ParameterValue> parameters = this.getDefaultParameters();
             parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
@@ -204,7 +206,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
 
     public void run(final GitlabMergeRequest mr) {
         if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(mr.getSourceBranch()) && this.isBranchAllowed(mr.getTargetBranch())) {
-            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
+            final List<ParameterValue> parameters = this.getDefaultParameters();
             parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
@@ -229,6 +231,21 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 }
             }
         }
+    }
+
+    private List<ParameterValue> getDefaultParameters() {
+        final List<ParameterValue> list = new ArrayList<ParameterValue>();
+        if (this.job instanceof Job<?, ?>) {
+            final Job<?, ?> asJob = (Job<?, ?>) this.job;
+            final ParametersDefinitionProperty prop = asJob.getProperty(ParametersDefinitionProperty.class);
+            if (prop != null) {
+                for (final ParameterDefinition def : prop.getParameterDefinitions()) {
+                    list.add(def.getDefaultParameterValue());
+                }
+            }
+        }
+
+        return list;
     }
 
     private void schedule(final Cause cause, final Action... actions) {
