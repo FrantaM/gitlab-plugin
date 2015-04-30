@@ -159,7 +159,7 @@ public class CommitAction {
                         for (final int build : e.getValue().listNumbers()) {
                             final Run<?, ?> fprun = fpjob.getBuildByNumber(build);
                             if (fprun != null) {
-                                fpruns.add(run);
+                                fpruns.add(fprun);
                             }
                         }
 
