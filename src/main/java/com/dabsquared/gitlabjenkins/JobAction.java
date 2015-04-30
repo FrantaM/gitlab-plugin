@@ -284,11 +284,13 @@ public class JobAction {
         if (GitlabPushHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             final GitlabPushHook event = GitLabRootAction.JSON.readValue(json, GitlabPushHook.class);
             if (event.isBranchRemoveEvent()) {
-                log.debug("Removed branch {}. Build skipped.", event.getRef());
+                log.debug("Skipping build of removed branch {}.", event.getRef());
                 return HttpResponses.ok();
             }
 
             final PushToOpenMRPolicy openMRPolicy = trigger.getTriggerOpenMergeRequestOnPush();
+            log.debug("Push to open merge requests policy: {}", openMRPolicy);
+
             switch (openMRPolicy) {
                 case BUILD_BRANCH_AND_MR:
                 case BUILD_MR:
@@ -299,6 +301,7 @@ public class JobAction {
                             final GitlabProject gp = api.getProject(event.getProjectId());
                             for (final GitlabMergeRequest mr : api.getOpenMergeRequests(gp)) {
                                 if (event.getRef().endsWith(mr.getSourceBranch())) {
+                                    log.info("Building merge request #{} for push to {}.", mr.getIid(), event.getRef());
                                     trigger.run(mr);
 
                                     if (openMRPolicy == PushToOpenMRPolicy.BUILD_MR) {
@@ -322,6 +325,8 @@ public class JobAction {
                 case BUILD_BRANCH:
                     if (!event.isTagEvent()) {
                         trigger.run(event);
+                    } else {
+                        log.info("Skipping build of tag {}.", event.getRef());
                     }
             }
         } else if (GitlabMergeRequestHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {

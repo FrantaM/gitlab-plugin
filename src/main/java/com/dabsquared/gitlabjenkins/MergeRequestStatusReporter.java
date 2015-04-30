@@ -33,6 +33,7 @@ import org.gitlab.api.models.GitlabProject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 
+import lombok.Getter;
 import lombok.Setter;
 
 import hudson.Extension;
@@ -58,7 +59,8 @@ import jenkins.tasks.SimpleBuildStep;
  */
 public class MergeRequestStatusReporter extends Notifier implements SimpleBuildStep {
 
-    @Setter @DataBoundSetter @Nullable
+    @Setter @Getter
+    @DataBoundSetter @Nullable
     private String runParameterName;
 
     @DataBoundConstructor
