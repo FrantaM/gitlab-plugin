@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -160,7 +162,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     public void run(final GitlabPushHook event) {
         final String branchName = StringUtils.removeStart(event.getRef(), "refs/heads/");
         if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
-            final List<ParameterValue> parameters = this.getDefaultParameters();
+            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
             parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
             parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
 
@@ -172,7 +174,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(repo.getGitHttpUrl()));
 
             final GitLabPushCause cause = new GitLabPushCause(event);
-            this.schedule(cause, new ParametersAction(parameters), new RevisionParameterAction(event.getAfter()));
+            this.schedule(cause, this.mergeDefaultParameters(parameters), new RevisionParameterAction(event.getAfter()));
         }
     }
 
@@ -194,7 +196,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 return;
             }
 
-            final List<ParameterValue> parameters = this.getDefaultParameters();
+            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
             parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
@@ -204,13 +206,13 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(mr.getSource().getHttpUrl()));
 
             final GitLabMergeCause cause = new GitLabMergeCause(event);
-            this.schedule(cause, new ParametersAction(parameters));
+            this.schedule(cause, this.mergeDefaultParameters(parameters));
         }
     }
 
     public void run(final GitlabMergeRequest mr) {
         if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(mr.getSourceBranch()) && this.isBranchAllowed(mr.getTargetBranch())) {
-            final List<ParameterValue> parameters = this.getDefaultParameters();
+            final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
             parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
             parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
 
@@ -226,7 +228,7 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                         parameters.add(BuildParameters.GITLAB_SOURCE_HTTP.withValueOf(source.getHttpUrl()));
 
                         final GitLabMergeCause cause = new GitLabMergeCause(mr);
-                        this.schedule(cause, new ParametersAction(parameters));
+                        this.schedule(cause, this.mergeDefaultParameters(parameters));
                     } else {
                         log.warn("Cannot find source project #{} (insufficient permissions?)", mr.getSourceProjectId());
                     }
@@ -237,19 +239,25 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         }
     }
 
-    private List<ParameterValue> getDefaultParameters() {
-        final List<ParameterValue> list = new ArrayList<ParameterValue>();
+    private ParametersAction mergeDefaultParameters(final List<ParameterValue> parameters) {
+        final Map<String, ParameterValue> parametersMap = new HashMap<String, ParameterValue>();
+        for (final ParameterValue pv : parameters) {
+            parametersMap.put(pv.getName(), pv);
+        }
+
         if (this.job instanceof Job<?, ?>) {
             final Job<?, ?> asJob = (Job<?, ?>) this.job;
             final ParametersDefinitionProperty prop = asJob.getProperty(ParametersDefinitionProperty.class);
             if (prop != null) {
                 for (final ParameterDefinition def : prop.getParameterDefinitions()) {
-                    list.add(def.getDefaultParameterValue());
+                    if (!parametersMap.containsKey(def.getName())) {
+                        parametersMap.put(def.getName(), def.getDefaultParameterValue());
+                    }
                 }
             }
         }
 
-        return list;
+        return new ParametersAction(new ArrayList<ParameterValue>(parametersMap.values()));
     }
 
     private void schedule(final Cause cause, final Action... actions) {
@@ -260,7 +268,9 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         realActions[0] = new CauseAction(cause);
         System.arraycopy(actions, 0, realActions, 1, actions.length);
 
-        sci.scheduleBuild2(sci.getQuietPeriod(), realActions);
+        if (sci.scheduleBuild2(sci.getQuietPeriod(), realActions) == null) {
+            log.warn("Cannot schedule build.");
+        }
     }
 
     @Override
