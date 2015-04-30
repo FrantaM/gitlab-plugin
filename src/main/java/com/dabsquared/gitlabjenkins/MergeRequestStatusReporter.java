@@ -82,7 +82,7 @@ public class MergeRequestStatusReporter extends Notifier implements SimpleBuildS
                 for (final RunParameterValue rpv : Util.filter(pa, RunParameterValue.class)) {
                     if (rpv.getName().equals(this.runParameterName)) {
                         runToProcess = rpv.getRun();
-                        if (runToProcess != null) {
+                        if (runToProcess == null) {
                             listener.error("Requested run %s does not exist.", rpv.getRunId());
                             return;
                         }
