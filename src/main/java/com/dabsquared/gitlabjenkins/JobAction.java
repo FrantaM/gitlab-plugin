@@ -326,9 +326,7 @@ public class JobAction {
             }
         } else if (GitlabMergeRequestHook.OBJECT_KIND.equalsIgnoreCase(objectKind)) {
             final GitlabMergeRequestHook event = GitLabRootAction.JSON.readValue(json, GitlabMergeRequestHook.class);
-            if (event.getObjectAttributes().getAction() == GitlabMergeRequestHookAttrs.Action.OPEN) {
-                trigger.run(event);
-            }
+            trigger.run(event);
         } else {
             throw HttpResponses.status(HttpServletResponse.SC_BAD_REQUEST);
         }

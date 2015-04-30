@@ -189,6 +189,10 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 log.info("Skipping merge request #{} because it cannot be merged.", mr.getIid());
                 return;
             }
+            if (mr.getAction() != GitlabMergeRequestHookAttrs.Action.OPEN && mr.getAction() != GitlabMergeRequestHookAttrs.Action.REOPEN) {
+                log.info("Skipping merge request #{} because it's change ({}) is insignificant.", mr.getIid(), mr.getAction());
+                return;
+            }
 
             final List<ParameterValue> parameters = this.getDefaultParameters();
             parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
