@@ -163,9 +163,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         final String branchName = StringUtils.removeStart(event.getRef(), "refs/heads/");
         if (this.isTriggerOnPush() && this.isBranchAllowed(branchName)) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", branchName));
-            parameters.add(new StringParameterValue("gitlabTargetBranch", branchName));
-
             parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(branchName));
             parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(branchName));
 
@@ -197,9 +194,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
             }
 
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
-            parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
-
             parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(mr.getSourceBranch()));
             parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(mr.getTargetBranch()));
             parameters.add(BuildParameters.GITLAB_SOURCE_SSH.withValueOf(mr.getSource().getSshUrl()));
@@ -213,9 +207,6 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
     public void run(final GitlabMergeRequest mr) {
         if (this.isTriggerOnMergeRequest() && this.isBranchAllowed(mr.getSourceBranch()) && this.isBranchAllowed(mr.getTargetBranch())) {
             final List<ParameterValue> parameters = new ArrayList<ParameterValue>();
-            parameters.add(new StringParameterValue("gitlabSourceBranch", mr.getSourceBranch()));
-            parameters.add(new StringParameterValue("gitlabTargetBranch", mr.getTargetBranch()));
-
             parameters.add(BuildParameters.GITLAB_SOURCE_BRANCH.withValueOf(mr.getSourceBranch()));
             parameters.add(BuildParameters.GITLAB_TARGET_BRANCH.withValueOf(mr.getTargetBranch()));
 
