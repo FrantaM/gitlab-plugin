@@ -2,7 +2,7 @@
     <f:entry title="${%Result}" field="result">
         <f:select />
     </f:entry>
-    <f:entry title="${%Comment}" field="comment">
+    <f:entry title="${%Comment}" field="message">
         <f:textarea />
     </f:entry>
     <f:entry>
