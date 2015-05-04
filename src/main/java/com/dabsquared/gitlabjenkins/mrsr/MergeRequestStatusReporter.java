@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package com.dabsquared.gitlabjenkins;
+package com.dabsquared.gitlabjenkins.mrsr;
 
 import java.io.IOException;
 
@@ -33,6 +33,10 @@ import org.gitlab.api.models.GitlabProject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 
+import com.dabsquared.gitlabjenkins.GitLabMergeCause;
+import com.dabsquared.gitlabjenkins.GitLabTrigger;
+import com.dabsquared.gitlabjenkins.Messages;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -40,7 +44,10 @@ import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.Util;
+import hudson.init.InitMilestone;
+import hudson.init.Initializer;
 import hudson.model.AbstractProject;
+import hudson.model.Items;
 import hudson.model.ParametersAction;
 import hudson.model.Result;
 import hudson.model.Run;
@@ -59,8 +66,11 @@ import jenkins.tasks.SimpleBuildStep;
  */
 public class MergeRequestStatusReporter extends Notifier implements SimpleBuildStep {
 
-    @Setter @Getter
-    @DataBoundSetter @Nullable
+    /**
+     * Name of parameter holding runId of
+     * build which result should be reported.
+     */
+    @Setter @Getter @DataBoundSetter @Nullable
     private String runParameterName;
 
     @DataBoundConstructor
@@ -83,7 +93,7 @@ public class MergeRequestStatusReporter extends Notifier implements SimpleBuildS
                     if (rpv.getName().equals(this.runParameterName)) {
                         runToProcess = rpv.getRun();
                         if (runToProcess == null) {
-                            listener.error("Requested run %s does not exist.", rpv.getRunId());
+                            listener.error(Messages.MergeRequestStatusReporter_NoSuchRun(rpv.getRunId()));
                             return;
                         }
 
@@ -124,6 +134,12 @@ public class MergeRequestStatusReporter extends Notifier implements SimpleBuildS
 
     @Extension
     public static class DescriptorImpl extends BuildStepDescriptor<Publisher> {
+
+        @Initializer(before = InitMilestone.PLUGINS_STARTED)
+        public static void addAliases() {
+            Items.XSTREAM2.addCompatibilityAlias("com.dabsquared.gitlabjenkins.MergeRequestStatusReporter",
+                                                 MergeRequestStatusReporter.class);
+        }
 
         @Override @SuppressWarnings("rawtypes")
         public boolean isApplicable(final Class<? extends AbstractProject> jobType) {
