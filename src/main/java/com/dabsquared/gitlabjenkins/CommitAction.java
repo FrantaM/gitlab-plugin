@@ -24,14 +24,8 @@
 package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -43,25 +37,15 @@ import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
-import com.chikli.hudson.plugin.naginator.NaginatorCause;
-
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import hudson.Plugin;
-import hudson.model.Cause;
-import hudson.model.CauseAction;
-import hudson.model.Fingerprint;
-import hudson.model.Fingerprint.RangeSet;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.plugins.git.Revision;
 import hudson.plugins.git.util.BuildData;
-import hudson.security.ACL;
-import hudson.tasks.Fingerprinter.FingerprintAction;
 import hudson.util.HttpResponses;
-import hudson.util.ReflectionUtils;
 
 import jenkins.model.Jenkins;
 import jenkins.security.NotReallyRoleSensitiveCallable;
@@ -75,18 +59,6 @@ import jenkins.security.NotReallyRoleSensitiveCallable;
 @Slf4j
 public class CommitAction {
 
-    private static final Comparator<Run<?, ?>> RUN_COMPARATOR = new Comparator<Run<?, ?>>() {
-
-        @Override
-        public int compare(final Run<?, ?> o1, final Run<?, ?> o2) {
-            int d = o1.getParent().getFullName().compareTo(o2.getParent().getFullName());
-            if (d == 0) {
-                d = o1.getNumber() - o2.getNumber();
-            }
-            return d;
-        }
-
-    };
     /**
      * Job of {@link #run}.
      * Needed because the run may be null.
@@ -123,7 +95,7 @@ public class CommitAction {
             assert lastrev != null;
             status.setSha(lastrev.getSha1String());
 
-            for (final Run<?, ?> downstream : this.findAllRuns()) {
+            for (final Run<?, ?> downstream : RunResult.findAllRuns(this.run)) {
                 status.addRun(downstream);
             }
         }
@@ -137,88 +109,6 @@ public class CommitAction {
             }
 
         };
-    }
-
-    private SortedSet<Run<?, ?>> findAllRuns() {
-        final SortedSet<Run<?, ?>> list = new TreeSet<Run<?, ?>>(RUN_COMPARATOR);
-        if (this.run != null) {
-            list.add(this.run);
-            list.addAll(this.findDownstreamRuns(list, this.run));
-        }
-
-        return list;
-    }
-
-    private SortedSet<Run<?, ?>> findDownstreamRuns(final SortedSet<Run<?, ?>> list, final Run<?, ?> run) {
-        for (final FingerprintAction fa : run.getActions(FingerprintAction.class)) {
-            for (final Fingerprint fp : fa.getFingerprints().values()) {
-                for (final Map.Entry<String, RangeSet> e : fp.getUsages().entrySet()) {
-                    final Job<?, ?> fpjob = ACL.impersonate(ACL.SYSTEM, new JobByNameCallable(e.getKey()));
-                    if (fpjob != null) {
-                        final List<Run<?, ?>> fpruns = new ArrayList<Run<?, ?>>();
-                        for (final int build : e.getValue().listNumbers()) {
-                            final Run<?, ?> fprun = fpjob.getBuildByNumber(build);
-                            if (fprun != null) {
-                                fpruns.add(fprun);
-                            }
-                        }
-
-                        /* #3: Consider only latest naginator-rescheduled downstream run */
-                        final Plugin naginator = Jenkins.getActiveInstance().getPlugin("naginator");
-                        if (naginator != null && naginator.getWrapper().isActive()) {
-                            for (final Iterator<Run<?, ?>> i = fpruns.iterator(); i.hasNext();) {
-                                final Run<?, ?> fprun = i.next();
-                                for (final Run<?, ?> remaining : fpruns) {
-                                    final Integer ngc = this.getNaginatorCause(remaining);
-                                    if (ngc != null && ngc.equals(fprun.getNumber())) {
-                                        i.remove();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        for (final Run<?, ?> fprun : fpruns) {
-                            if (list.add(fprun)) {
-                                this.findDownstreamRuns(list, fprun);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return list;
-    }
-
-    @Nullable
-    private Integer getNaginatorCause(@Nonnull final Run<?, ?> run) {
-        for (final CauseAction ca : run.getActions(CauseAction.class)) {
-            for (final Cause c : ca.getCauses()) {
-                if (c instanceof NaginatorCause) {
-                    try {
-                        final Field field = ReflectionUtils.findField(c.getClass(), "summary");
-                        ReflectionUtils.makeAccessible(field);
-
-                        final String summary = String.valueOf(field.get(c));
-                        if (summary.startsWith("#")) {
-                            return Integer.valueOf(summary.substring(1));
-                        } else {
-                            log.debug("summary field in NaginatorCause does not "
-                                      + "contain build number. value={}", summary);
-                        }
-                    } catch (final SecurityException ex) {
-                        log.warn("cannot access field in NaginatorCause", ex);
-                    } catch (final ReflectiveOperationException ex) {
-                        log.warn("cannot access field in NaginatorCause", ex);
-                    } catch (final NumberFormatException ex) {
-                        log.warn("summary field in NaginatorCause has unexpected value", ex);
-                    }
-                }
-            }
-        }
-
-        return null;
     }
 
     public void doDynamic(final StaplerRequest req, final StaplerResponse rsp) throws IOException, ServletException {

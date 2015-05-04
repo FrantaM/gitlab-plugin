@@ -3,5 +3,8 @@
         <f:entry title="${%Run parameter name}" field="runParameterName">
             <f:textbox />
         </f:entry>
+        <f:entry title="${%Custom messages}">
+            <f:repeatableProperty field="comments" />
+        </f:entry>
     </f:advanced>
 </j:jelly>

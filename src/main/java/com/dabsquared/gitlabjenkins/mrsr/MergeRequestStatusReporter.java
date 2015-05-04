@@ -24,28 +24,40 @@
 package com.dabsquared.gitlabjenkins.mrsr;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.gitlab.api.GitlabAPI;
 import org.gitlab.api.models.GitlabMergeRequest;
 import org.gitlab.api.models.GitlabProject;
+import org.jenkinsci.plugins.tokenmacro.MacroEvaluationException;
+import org.jenkinsci.plugins.tokenmacro.TokenMacro;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 
 import com.dabsquared.gitlabjenkins.GitLabMergeCause;
 import com.dabsquared.gitlabjenkins.GitLabTrigger;
 import com.dabsquared.gitlabjenkins.Messages;
+import com.dabsquared.gitlabjenkins.RunResult;
+import com.dabsquared.gitlabjenkins.mrsr.macro.OverallResultMacro;
+import com.dabsquared.gitlabjenkins.mrsr.macro.ResultBreakdownMacro;
+import com.dabsquared.gitlabjenkins.mrsr.macro.ThumbMacro;
 
 import lombok.Getter;
 import lombok.Setter;
 
+import hudson.AbortException;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.Util;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
+import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Items;
 import hudson.model.ParametersAction;
@@ -72,6 +84,11 @@ public class MergeRequestStatusReporter extends Notifier implements SimpleBuildS
      */
     @Setter @Getter @DataBoundSetter @Nullable
     private String runParameterName;
+    /**
+     * Comment definitions.
+     */
+    @Setter @Getter @DataBoundSetter @Nullable
+    private List<MRComment> comments;
 
     @DataBoundConstructor
     public MergeRequestStatusReporter() {
@@ -106,13 +123,13 @@ public class MergeRequestStatusReporter extends Notifier implements SimpleBuildS
         this.perform(runToProcess, listener);
     }
 
-    private void perform(final Run<?, ?> run, final TaskListener listener) {
+    private void perform(final Run<?, ?> run, final TaskListener listener) throws IOException, InterruptedException {
         final GitLabMergeCause mrc = run.getCause(GitLabMergeCause.class);
         if (mrc == null) {
             return;
         }
 
-        final String message = run.getResult() == Result.SUCCESS ? ":+1:" : ":-1:";
+        final String message = this.buildMergeRequestComment(run, listener);
 
         final GitLabTrigger.DescriptorImpl d = GitLabTrigger.all().get(GitLabTrigger.DescriptorImpl.class);
         final GitlabAPI api = d.newGitlabConnection();
@@ -124,6 +141,37 @@ public class MergeRequestStatusReporter extends Notifier implements SimpleBuildS
             } catch (final IOException ex) {
                 ex.printStackTrace(listener.error(Messages.MergeRequestStatusReporter_CannotAddNote(mrc.getRequestId())));
             }
+        }
+    }
+
+    @Nonnull
+    private String buildMergeRequestComment(final Run<?, ?> run, final TaskListener listener) throws IOException, InterruptedException {
+        final Result result = RunResult.worstOf(run);
+        if (result == null) {
+            throw new AbortException("Run %s is not completed yet.");
+        }
+
+        String message = Messages.MergeRequestStatusReporter_DefaultComment();
+        for (final MRComment comment : Util.fixNull(this.getComments())) {
+            if (result.equals(comment.getResult())) {
+                message = comment.getMessage();
+                break;
+            }
+        }
+
+        if (run instanceof AbstractBuild<?, ?>) {
+            final List<TokenMacro> macros = new ArrayList<TokenMacro>();
+            macros.add(new OverallResultMacro());
+            macros.add(new ResultBreakdownMacro());
+            macros.add(new ThumbMacro());
+
+            try {
+                return TokenMacro.expandAll((AbstractBuild<?, ?>) run, listener, message, false, macros);
+            } catch (final MacroEvaluationException ex) {
+                throw new AssertionError(ex);
+            }
+        } else {
+            return message;
         }
     }
 
