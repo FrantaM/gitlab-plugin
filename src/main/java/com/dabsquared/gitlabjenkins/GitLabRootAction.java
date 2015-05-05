@@ -25,6 +25,7 @@ package com.dabsquared.gitlabjenkins;
 
 import java.io.IOException;
 
+import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonProcessingException;
 import org.codehaus.jackson.Version;
@@ -32,8 +33,11 @@ import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.DeserializationContext;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.PropertyNamingStrategy;
+import org.codehaus.jackson.map.deser.std.StdDeserializer;
 import org.codehaus.jackson.map.ext.JodaDeserializers;
 import org.codehaus.jackson.map.module.SimpleModule;
+import org.gitlab.api.GitlabAPI;
+import org.gitlab.api.models.GitlabMergeRequest;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
@@ -55,12 +59,31 @@ import jenkins.model.Jenkins;
 @Extension @Slf4j
 public class GitLabRootAction implements UnprotectedRootAction, StaplerProxy {
 
-    public static final ObjectMapper JSON = new ObjectMapper()
+    public static final ObjectMapper JSON = GitlabAPI.MAPPER
             .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES)
             .withModule(new SimpleModule("GitLabPlugin", new Version(1, 0, 0, null)) {
 
                 {
+                    addDeserializer(GitlabMergeRequest.class, new StdDeserializer<GitlabMergeRequest>(GitlabMergeRequest.class) {
+
+                        @Override
+                        public GitlabMergeRequest deserialize(final JsonParser jp, final DeserializationContext dc) throws IOException, JsonProcessingException {
+                            final JsonNode node = jp.readValueAsTree();
+
+                            final ObjectMapper mapper = new ObjectMapper()
+                                    .configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+                            final GitlabMergeRequest mr = mapper.treeToValue(node, GitlabMergeRequest.class);
+                            if (mr.getTargetProjectId() == null) {
+                                mr.setTargetProjectId(node.get("target_project_id").asInt());
+                            }
+
+                            return mr;
+                        }
+
+                    });
+
                     addDeserializer(DateTime.class, new JodaDeserializers.DateTimeDeserializer<DateTime>(DateTime.class) {
 
                         private final DateTimeFormatter fmt = new DateTimeFormatterBuilder()

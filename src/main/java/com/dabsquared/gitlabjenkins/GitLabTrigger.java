@@ -226,7 +226,11 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
                 } catch (final IOException ex) {
                     log.warn("Cannot fetch source project #{}", mr.getSourceProjectId(), ex);
                 }
+            } else {
+                log.warn("Gitlab API access not available. Cannot fetch information about merge request #{}.", mr.getId());
             }
+        } else {
+            log.debug("Conditions to build merge request #{} not met; build skipped.", mr.getId());
         }
     }
 
@@ -259,8 +263,11 @@ public class GitLabTrigger extends Trigger<BuildableItem> {
         realActions[0] = new CauseAction(cause);
         System.arraycopy(actions, 0, realActions, 1, actions.length);
 
-        if (sci.scheduleBuild2(sci.getQuietPeriod(), realActions) == null) {
+        final Object feature = sci.scheduleBuild2(sci.getQuietPeriod(), realActions);
+        if (feature == null) {
             log.warn("Cannot schedule build.");
+        } else {
+            log.debug("Scheduled build of {}.", this.job.getFullName());
         }
     }
 
